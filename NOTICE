@@ -1,0 +1,22 @@
+検査成績書 OCR 良否判定 (document-ocr)
+Copyright 2026 Tomohiro Kusu
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+--------------------------------------------------------------------------
+第三者の著作物について
+
+次のものはこのリポジトリのライセンス（Apache-2.0）の対象外です。
+
+1. サンプル画像・基準画像
+   sample/inspection_sample.gif、sample/denshitenbin_kensa_seisekisho01.jpg、
+   configs/denshitenbin.jpg、および docs/images/ のスクリーンショットに写っている
+   帳票の内容は、各帳票の作成者に権利があります。
+
+2. OCR エンジンと依存パッケージ（このリポジトリには同梱せず、uv / winget で別途導入）
+   - indra-ocr: コードは Apache-2.0。モデルの重みは独自条件付きの OpenRAIL-M
+     （https://huggingface.co/datalab-to/indra-ocr/blob/main/LICENSE）。
+     初回実行時に Hugging Face からダウンロードされ、利用にはその条件が適用されます。
+   - Tesseract OCR: Apache-2.0
+   - NumPy (BSD-3-Clause ほか)、OpenCV (Apache-2.0)、Pillow (MIT-CMU)、
+     PyYAML (MIT)、pytesseract (Apache-2.0) ほか。各パッケージのライセンスに従います。

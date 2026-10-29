@@ -4,8 +4,11 @@ OCR エンジンは Tesseract か indra-ocr（ONNX Runtime、CPU）を選べる�
 どちらも画像は外部に送信せず、すべてこの PC 上で処理する
 （indra-ocr は初回のみモデルを Hugging Face からダウンロードする）。
 
+帳票の様式は設定ファイル（configs/*.yaml）で切り替える。
+type: neomag はこのファイルの NeoMag 専用ロジック、type: template は template_ocr.py の汎用処理で読む。
+
 使い方:
-    uv run inspection_ocr.py sample/inspection_sample.gif [--engine indra] [--config config.yaml] [--debug]
+    uv run inspection_ocr.py 画像 [--config configs/neomag.yaml] [--engine indra] [--debug]
 
 終了コード: 0=合格, 1=不合格, 2=要目視確認, 3=読み取りエラー
 """
@@ -13,20 +16,36 @@ OCR エンジンは Tesseract か indra-ocr（ONNX Runtime、CPU）を選べる�
 from __future__ import annotations
 
 import argparse
-import functools
-import os
 import re
-import shutil
 import sys
-import unicodedata
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from pathlib import Path
 
 import cv2
 import numpy as np
-import pytesseract
-import yaml
-from PIL import Image
+
+from ocr_common import (  # noqa: F401  (Read 等は tests から io.X として参照される)
+    CHECK,
+    CONFIG_DIR,
+    NG,
+    OK,
+    Cell,
+    LayoutError,
+    Read,
+    Row,
+    decimals_of,
+    find_tesseract,
+    indra_page_lines,
+    judge,
+    lines_in_cell,
+    load_config,
+    load_image_gray,
+    ocr_cell,
+    pad,
+    parse_number,
+    setup_engine,
+    verdict_of,
+)
 
 SCALE = 4  # 低解像度の帳票を拡大してから OCR する倍率
 N_DATA_ROWS = 20
@@ -42,40 +61,11 @@ MAGNETIC = ["Br", "Hcb", "Hcj", "BHmax"]
 SUMMARY_ROWS = ["max", "min", "ave", "cn"]
 SUMMARY_LABELS = {"max": "最大値", "min": "最小値", "ave": "平均値", "cn": "c/n"}
 
-OK, NG, CHECK = "OK", "NG", "要確認"
-
-
-class LayoutError(Exception):
-    pass
-
-
-# ---------------------------------------------------------------- 設定
-
-def load_config(path: Path) -> dict:
-    with open(path, encoding="utf-8") as f:
-        return yaml.safe_load(f) or {}
-
-
-def find_tesseract(cfg: dict) -> str:
-    candidates = [
-        cfg.get("tesseract_cmd"),
-        shutil.which("tesseract"),
-        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
-        os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
-    ]
-    for c in candidates:
-        if c and Path(c).is_file():
-            return str(c)
-    raise FileNotFoundError(
-        "Tesseract が見つかりません。config.yaml の tesseract_cmd にパスを設定してください。"
-    )
-
 
 # ---------------------------------------------------------------- 表構造の検出
 
 def load_gray(path: Path) -> np.ndarray:
-    # cv2.imread は GIF 非対応のため Pillow で読む
-    gray = np.array(Image.open(path).convert("L"))
+    gray = load_image_gray(path)
     return cv2.resize(gray, None, fx=SCALE, fy=SCALE, interpolation=cv2.INTER_CUBIC)
 
 
@@ -152,69 +142,6 @@ def locate_layout(h_lines: list[int]) -> Layout:
 
 # ---------------------------------------------------------------- OCR
 
-@dataclass
-class Read:
-    text: str
-    conf: float  # 0〜100、文字が無ければ -1
-    note: str = ""  # 読み取り時点で分かった問題（あれば要確認にする）
-
-
-def ocr_cell(gray: np.ndarray, x0: int, x1: int, y0: int, y1: int) -> Read:
-    m = 3 * SCALE  # 罫線を含めないよう内側に切り出す
-    crop = gray[y0 + m : y1 - m, x0 + m : x1 - m]
-    crop = cv2.copyMakeBorder(crop, 20, 20, 20, 20, cv2.BORDER_CONSTANT, value=255)
-    # 二値化や文字種ホワイトリストは使わない。低解像度の帳票では二値化で字形が崩れ、
-    # ホワイトリストは誤読を数字に当てはめて隠してしまう（信頼度も無意味になる）。
-    # 数字以外が読めた場合は後段の書式チェックで「要確認」にする。
-    data = pytesseract.image_to_data(
-        crop, config="--psm 7 --oem 1", output_type=pytesseract.Output.DICT
-    )
-    words = [(t.strip(), float(c)) for t, c in zip(data["text"], data["conf"]) if t.strip()]
-    if not words:
-        return Read("", -1)
-    return Read("".join(t for t, _ in words), min(c for _, c in words))
-
-
-@functools.cache
-def _indra_converter(model_dir: str | None):
-    try:
-        import indra_ocr  # Tesseract 使用時は読み込まない
-    except ImportError as e:
-        print(
-            "indra-ocr が見つかりません。uv の環境で実行してください:\n"
-            "    uv run inspection_ocr.py <画像> --engine indra",
-            file=sys.stderr,
-        )
-        raise SystemExit(3) from e  # 1 は「不合格」と紛らわしいので読み取りエラーの 3
-
-    return indra_ocr.load(path=model_dir, mode="ocr")
-
-
-def indra_lines(path: Path, model_dir: str | None) -> list[tuple[tuple[float, ...], str, float]]:
-    """ページ全体を indra-ocr で読み、(拡大後座標の box, 文字列, 信頼度 0〜100) を返す。"""
-    gray = np.array(Image.open(path).convert("L"))
-    page = _indra_converter(model_dir).ocr(gray)
-    return [(tuple(v * SCALE for v in ln.box), ln.text, float(ln.conf) * 100) for ln in page.lines]
-
-
-def lines_in_cell(lines, x0: int, x1: int, y0: int, y1: int) -> Read:
-    """中心がセル内にある行を集めて 1 セル分の読み取り結果にする。"""
-    hits = sorted(
-        (ln for ln in lines if x0 <= (ln[0][0] + ln[0][2]) / 2 < x1 and y0 <= (ln[0][1] + ln[0][3]) / 2 < y1),
-        key=lambda ln: ln[0][0],
-    )
-    if not hits:
-        return Read("", -1)
-    # indra-ocr は "1. 99" のように数字の間へ空白を入れることがあるので除く
-    text = "".join(t for _, t, _ in hits).replace(" ", "")
-    read = Read(text, min(c for _, _, c in hits))
-    # 1 行が縦罫線をまたいでいる = 隣のセルの文字と結合されている
-    m = 3 * SCALE
-    if any(b[0] < x0 - m or b[2] > x1 + m for b, _, _ in hits):
-        read.note = f"隣のセルと結合して読まれました ('{' / '.join(t for _, t, _ in hits)}')"
-    return read
-
-
 def _columns(v_mask: np.ndarray, y0: int, y1: int, expected: int) -> list[tuple[int, int]]:
     xs = vertical_lines(v_mask, y0, y1)
     cols = list(zip(xs, xs[1:]))
@@ -244,13 +171,13 @@ def read_document(
     lot_col = _columns(v_mask, *layout.lot_row, 2)[1]
 
     boxes: list[tuple[int, int, int, int]] = []
-    lines = indra_lines(path, indra_model_dir) if engine == "indra" else None
+    lines = indra_page_lines(load_image_gray(path), indra_model_dir, SCALE) if engine == "indra" else None
 
     def read(x: tuple[int, int], y: tuple[int, int]) -> Read:
         boxes.append((x[0], x[1], y[0], y[1]))
         if lines is not None:
-            return lines_in_cell(lines, x[0], x[1], y[0], y[1])
-        return ocr_cell(gray, x[0], x[1], y[0], y[1])
+            return lines_in_cell(lines, x[0], x[1], y[0], y[1], 3 * SCALE)
+        return ocr_cell(gray, x[0], x[1], y[0], y[1], 3 * SCALE)
 
     raw = {
         "engine": engine,
@@ -270,23 +197,11 @@ def read_document(
         for x0, x1, y0, y1 in boxes:
             m = 3 * SCALE
             cv2.rectangle(vis, (x0 + m, y0 + m), (x1 - m, y1 - m), (0, 0, 255), 2)
-        cv2.imwrite(str(debug_dir / f"{path.stem}_cells.png"), vis)
+        cv2.imencode(".png", vis)[1].tofile(debug_dir / f"{path.stem}_cells.png")  # 日本語パス対応
     return raw
 
 
 # ---------------------------------------------------------------- 判定
-
-@dataclass
-class Cell:
-    text: str
-    value: float | None = None
-    status: str = OK
-    notes: list[str] = field(default_factory=list)
-
-    def flag(self, note: str) -> None:
-        self.status = CHECK
-        self.notes.append(note)
-
 
 @dataclass
 class Report:
@@ -303,39 +218,23 @@ class Report:
         cells = [c for col in self.data.values() for c in col]
         cells += [c for col in self.summary.values() for c in col.values()]
         cells += list(self.magnetic.values())
-        if self.issues or any(c.status == CHECK for c in cells):
-            return "要目視確認"
-        if any(c.status == NG for c in cells):
-            return "不合格"
-        return "合格"
+        return verdict_of((c.status for c in cells), bool(self.issues))
 
+    def rows(self) -> list[Row]:
+        def row(item: str, c: Cell) -> Row:
+            return Row(item, c.text, c.status, "; ".join(c.notes))
 
-def _decimals(text: str) -> int:
-    return len(text.split(".")[1]) if "." in text else 0
-
-
-def parse_number(r: Read, decimals: int | None, min_conf: float) -> Cell:
-    cell = Cell(r.text)
-    if r.note:
-        cell.flag(r.note)
-    if not re.fullmatch(r"\d+(\.\d+)?", r.text):
-        cell.flag(f"数値として読めません ('{r.text}')")
-        return cell
-    cell.value = float(r.text)
-    if decimals is not None and _decimals(r.text) != decimals:
-        cell.flag(f"小数桁数が {decimals} 桁ではありません ('{r.text}')")
-    if r.conf < min_conf:
-        cell.flag(f"OCR 信頼度が低い ({r.conf:.0f})")
-    return cell
-
-
-def judge(cell: Cell, spec: tuple[float, float] | None) -> None:
-    if spec is None or cell.value is None or cell.status == CHECK:
-        return
-    lo, hi = spec
-    if not lo <= cell.value <= hi:
-        cell.status = NG
-        cell.notes.append(f"規格外 ({lo:g}〜{hi:g})")
+        out = [Row("ロットNo.", self.lot, OK)]
+        out += [row(f"磁気特性 {k}", c) for k, c in self.magnetic.items()]
+        for col in COLUMNS:
+            s = self.specs[col]
+            out.append(Row(f"{COLUMN_LABELS[col]} 規格", f"{s[0]:g}-{s[1]:g}" if s else "(不明)", OK if s else CHECK))
+        for col in COLUMNS:
+            out += [row(f"{COLUMN_LABELS[col]} No.{i + 1}", c) for i, c in enumerate(self.data[col])]
+        for col in COLUMNS:
+            out += [row(f"{COLUMN_LABELS[col]} {SUMMARY_LABELS[k]}", c) for k, c in self.summary[col].items()]
+        out += [Row("（全体）", "", CHECK, s) for s in self.issues]
+        return out
 
 
 def resolve_spec(col: str, raw: dict, cfg: dict, issues: list[str]) -> tuple[float, float] | None:
@@ -347,7 +246,7 @@ def resolve_spec(col: str, raw: dict, cfg: dict, issues: list[str]) -> tuple[flo
     if not m or float(m[1]) >= float(m[2]):
         issues.append(
             f"{COLUMN_LABELS[col]}: 検査規格欄を読めません ('{r.text if r else ''}')。"
-            "config.yaml に spec を設定してください"
+            "設定ファイル（GUI の様式設定）で規格を指定してください"
         )
         return None
     if r.conf < cfg.get("min_confidence", 60):
@@ -370,7 +269,7 @@ def cross_check(col: str, cells: list[Cell], summary: dict[str, Cell], issues: l
         if s.value is None:
             continue
         # 帳票の表示桁で丸めた誤差まで許容（平均値は四捨五入表示のため）
-        tol = 0.5 * 10 ** -_decimals(s.text) + 1e-9 if key == "ave" else 1e-9
+        tol = 0.5 * 10 ** -decimals_of(s.text) + 1e-9 if key == "ave" else 1e-9
         if abs(s.value - calc_v) > tol:
             s.flag(f"再計算値 {calc_v:g} と不一致")
             rows = [str(i + 1) for i, v in enumerate(values) if v == calc_v] if key != "ave" else []
@@ -419,12 +318,6 @@ def evaluate(raw: dict, cfg: dict) -> Report:
 
 # ---------------------------------------------------------------- 出力
 
-def _pad(s: str, width: int) -> str:
-    """全角文字を 2 桁として右寄せ。"""
-    w = sum(2 if unicodedata.east_asian_width(ch) in "FWA" else 1 for ch in s)
-    return " " * max(width - w, 0) + s
-
-
 def _fmt(cell: Cell) -> str:
     mark = {OK: "", NG: " NG", CHECK: " ?"}[cell.status]
     return (cell.text or "(空)") + mark
@@ -437,15 +330,15 @@ def print_report(path: Path, rep: Report) -> None:
     print()
     print("磁気特性値: " + "  ".join(f"{k}={_fmt(c)}" for k, c in rep.magnetic.items()))
     print()
-    print(_pad("No.", 8) + "".join(_pad(COLUMN_LABELS[c], w) for c in COLUMNS))
+    print(pad("No.", 8) + "".join(pad(COLUMN_LABELS[c], w) for c in COLUMNS))
     spec_txt = [f"{s[0]:g}-{s[1]:g}" if s else "(不明)" for s in rep.specs.values()]
-    print(_pad("規格", 8) + "".join(_pad(s, w) for s in spec_txt))
+    print(pad("規格", 8) + "".join(pad(s, w) for s in spec_txt))
     print("-" * (8 + w * len(COLUMNS)))
     for i in range(N_DATA_ROWS):
-        print(_pad(str(i + 1), 8) + "".join(_pad(_fmt(rep.data[c][i]), w) for c in COLUMNS))
+        print(pad(str(i + 1), 8) + "".join(pad(_fmt(rep.data[c][i]), w) for c in COLUMNS))
     print("-" * (8 + w * len(COLUMNS)))
     for key in SUMMARY_ROWS:
-        print(_pad(SUMMARY_LABELS[key], 8) + "".join(_pad(_fmt(rep.summary[c][key]), w) for c in COLUMNS))
+        print(pad(SUMMARY_LABELS[key], 8) + "".join(pad(_fmt(rep.summary[c][key]), w) for c in COLUMNS))
     print("(NG=規格外, ?=要確認)")
 
     details = []
@@ -471,18 +364,42 @@ def print_report(path: Path, rep: Report) -> None:
     print(f"■ 総合判定: {rep.verdict}")
 
 
+def analyze(path: Path, cfg: dict, engine: str, debug_dir: Path | None = None):
+    """設定の type に応じて読み取り・判定し、Report（verdict と rows() を持つ）を返す。
+
+    構造を検出できなければ LayoutError。
+    """
+    if cfg.get("type", "neomag") == "template":
+        import template_ocr  # NeoMag だけ使う場合は読み込まない
+
+        return template_ocr.analyze(path, cfg, engine, debug_dir)
+    raw = read_document(path, engine, debug_dir, cfg.get("indra_model_dir"))
+    return evaluate(raw, cfg)
+
+
+def report(path: Path, rep) -> None:
+    if isinstance(rep, Report):
+        print_report(path, rep)
+    else:
+        import template_ocr
+
+        template_ocr.print_report(path, rep)
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="検査成績書の OCR 良否判定（ローカル処理）")
     ap.add_argument("images", nargs="+", type=Path, help="検査成績書の画像ファイル")
-    ap.add_argument("--config", type=Path, default=Path(__file__).with_name("config.yaml"))
-    ap.add_argument("--engine", choices=["tesseract", "indra"], help="OCR エンジン（既定は config.yaml の engine）")
+    ap.add_argument(
+        "--config", type=Path, default=CONFIG_DIR / "neomag.yaml",
+        help="様式の設定ファイル（省略時は configs/neomag.yaml）",
+    )
+    ap.add_argument("--engine", choices=["tesseract", "indra"], help="OCR エンジン（既定は設定ファイルの engine）")
     ap.add_argument("--debug", action="store_true", help="セル切り出し位置を debug/ に画像出力")
     args = ap.parse_args(argv)
 
     cfg = load_config(args.config)
     engine = args.engine or cfg.get("engine", "tesseract")
-    if engine == "tesseract":
-        pytesseract.pytesseract.tesseract_cmd = find_tesseract(cfg)
+    setup_engine(engine, cfg)
 
     codes = {"合格": 0, "不合格": 1, "要目視確認": 2}
     worst = 0
@@ -490,15 +407,12 @@ def main(argv: list[str] | None = None) -> int:
         if i:
             print("\n" + "=" * 64 + "\n")
         try:
-            raw = read_document(
-                path, engine, Path("debug") if args.debug else None, cfg.get("indra_model_dir")
-            )
+            rep = analyze(path, cfg, engine, Path("debug") if args.debug else None)
         except LayoutError as e:
             print(f"{path}: 表の構造を検出できません - {e}", file=sys.stderr)
             worst = max(worst, 3)
             continue
-        rep = evaluate(raw, cfg)
-        print_report(path, rep)
+        report(path, rep)
         worst = max(worst, codes[rep.verdict])
     return worst
 

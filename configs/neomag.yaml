@@ -1,14 +1,9 @@
-# 検査成績書 OCR 良否判定の設定
+# NeoMag 検査成績書の設定（GUI の「様式設定」タブでも編集できます）
+type: neomag
+name: NeoMag 検査成績書
 
 # OCR エンジン: tesseract / indra（コマンドラインの --engine で上書き可）
 engine: tesseract
-
-# Tesseract の実行ファイル。null なら PATH / 標準インストール先から自動検出
-tesseract_cmd: null
-
-# indra-ocr のモデルフォルダ。null なら初回に Hugging Face からダウンロードしてキャッシュ
-# （2 回目以降は通信しない）。ネットワークの無い PC ではモデルを置いたフォルダを指定する
-indra_model_dir: null
 
 # これ未満の OCR 信頼度 (0-100) のセルは「要確認」にする
 min_confidence: 60

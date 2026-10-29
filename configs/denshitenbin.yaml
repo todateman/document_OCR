@@ -1,0 +1,136 @@
+type: template
+name: 電子天秤検査成績書
+description: |-
+  電子天秤検査成績書のサンプル様式。
+  数値の規格（調整後 ±2d）は仮の値です。実際の規格に設定してください。
+reference_image: denshitenbin.jpg
+engine: indra
+min_confidence: 60
+fields:
+- name: 基本情報
+  kind: table
+  box: [268, 334, 577, 688]
+  rows: 10
+  cols: 1
+  cell_kind: text
+  row_labels: [製造者, 機種名, 器物番号, 秤量, 読取限度, 検査年月日, 検査場所, 環境, 使用基準器, 検査区分]
+- name: 総合判定
+  kind: mark
+  options:
+  - {label: 合格, box: [652, 372, 915, 409]}
+  - {label: 不合格, box: [916, 372, 1157, 409]}
+  expect: [合格]
+- name: 外観・機能
+  kind: table
+  box: [821, 481, 894, 652]
+  rows: 5
+  cols: 1
+  cell_kind: text
+  row_labels: [表記・記号, 表示, 水準器, 操作スイッチ, 設置台]
+  expect: [OK]
+  ng_values: [NG]
+- name: 外観・機能 外乱等
+  kind: text
+  box: [821, 652, 894, 689]
+  expect: [無]
+  ng_values: [有]
+- name: CAL後SPAN値 1
+  kind: number
+  box: [971, 481, 1157, 515]
+  unit: g
+- name: CAL後SPAN値
+  kind: table
+  box: [971, 515, 1157, 618]
+  rows: 3
+  cols: 1
+  row_labels: ['2', '3', '4']
+  min: -2
+  max: 2
+  decimals: 0
+- name: 再現性 1回目
+  kind: table
+  box: [165, 865, 651, 900]
+  rows: 1
+  cols: 4
+  col_labels: [調整前ゼロ点, 調整前フル点, 調整後ゼロ点, 調整後フル点]
+  unit: g
+- name: 再現性 調整前
+  kind: table
+  box: [165, 900, 408, 1073]
+  rows: 5
+  cols: 2
+  row_labels: ['2', '3', '4', '5', '6']
+  col_labels: [ゼロ点, フル点]
+  decimals: 0
+- name: 再現性 調整後
+  kind: table
+  box: [408, 900, 651, 1073]
+  rows: 5
+  cols: 2
+  row_labels: ['2', '3', '4', '5', '6']
+  col_labels: [ゼロ点, フル点]
+  min: -2
+  max: 2
+  decimals: 0
+- name: 四隅 中心
+  kind: table
+  box: [202, 1178, 535, 1215]
+  rows: 1
+  cols: 2
+  col_labels: [調整前, 調整後]
+  unit: g
+- name: 四隅 調整前
+  kind: table
+  box: [202, 1215, 370, 1400]
+  rows: 5
+  cols: 1
+  row_labels: [左前, 左後, 右後, 右前, 中心]
+  decimals: 0
+- name: 四隅 調整後
+  kind: table
+  box: [370, 1215, 535, 1400]
+  rows: 5
+  cols: 1
+  row_labels: [左前, 左後, 右後, 右前, 中心]
+  min: -2
+  max: 2
+  decimals: 0
+- name: 直線性 調整前
+  kind: table
+  box: [669, 1216, 913, 1400]
+  rows: 5
+  cols: 3
+  row_labels: [0%, 25%, 50%, 75%, 100%]
+  col_labels: [荷重量, 増, 減]
+  unit: g
+  skip: 5-3
+- name: 直線性 調整後 荷重量
+  kind: table
+  box: [913, 1216, 1007, 1400]
+  rows: 5
+  cols: 1
+  row_labels: [0%, 25%, 50%, 75%, 100%]
+  unit: g
+- name: 直線性 調整後
+  kind: table
+  box: [1007, 1216, 1157, 1400]
+  rows: 5
+  cols: 2
+  row_labels: [0%, 25%, 50%, 75%, 100%]
+  col_labels: [増, 減]
+  min: -2
+  max: 2
+  decimals: 0
+  skip: 5-2
+- name: 感じ 下限
+  kind: mark
+  options:
+  - {label: 合, box: [203, 1469, 362, 1503]}
+  - {label: 否, box: [362, 1469, 505, 1503]}
+  expect: [合]
+- name: 感じ 秤量
+  kind: mark
+  options:
+  - {label: 合, box: [203, 1504, 362, 1541]}
+  - {label: 否, box: [362, 1504, 505, 1541]}
+  expect: [合]

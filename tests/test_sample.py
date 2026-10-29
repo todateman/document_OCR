@@ -35,7 +35,7 @@ EXPECTED_MAGNETIC = {"Br": "10.44", "Hcb": "9.92", "Hcj": "22.49", "BHmax": "26.
 
 @pytest.fixture(scope="module")
 def cfg():
-    return io.load_config(ROOT / "config.yaml")
+    return io.load_config(ROOT / "configs" / "neomag.yaml")
 
 
 @pytest.fixture(scope="module", params=["tesseract", "indra"])
