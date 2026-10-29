@@ -189,9 +189,19 @@ def lines_in_cell(lines, x0: int, x1: int, y0: int, y1: int, margin: int = 12) -
         # 縦罫線の上で検出された文字なしの行は罫線のかすれなので無視する
         return bool(ln[1].strip()) or x0 + m <= cx < x1 - m
 
-    hits = sorted((ln for ln in lines if inside(ln)), key=lambda ln: ln[0][0])
+    hits = sorted((ln for ln in lines if inside(ln)), key=lambda ln: (ln[0][1] + ln[0][3]) / 2)
     if not hits:
         return Read("", -1)
+    # 複数行あるセルは上の行から、各行の中は左から並べる（中心の高さが文字の高さの半分以内なら同じ行）
+    rows: list[list] = []
+    for ln in hits:
+        cy, hgt = (ln[0][1] + ln[0][3]) / 2, ln[0][3] - ln[0][1]
+        last = rows[-1][-1][0] if rows else None
+        if last is not None and abs(cy - (last[1] + last[3]) / 2) <= max(hgt, last[3] - last[1]) / 2:
+            rows[-1].append(ln)
+        else:
+            rows.append([ln])
+    hits = [ln for row in rows for ln in sorted(row, key=lambda ln: ln[0][0])]
     # ページ全体の OCR は "1. 99" のように数字の間へ空白を入れることがあるので除く
     text = "".join(t for _, t, _ in hits).replace(" ", "")
     read = Read(text, min(c for _, _, c in hits))

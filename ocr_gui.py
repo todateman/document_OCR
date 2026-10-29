@@ -25,6 +25,7 @@ from PIL import Image, ImageTk
 
 import inspection_ocr
 import template_ocr
+from document_input import load_source, page_count, page_label
 from ocr_common import (
     CHECK,
     CONFIG_DIR,
@@ -35,14 +36,19 @@ from ocr_common import (
     Row,
     config_name,
     load_config,
-    load_image_gray,
     load_settings,
     read_yaml,
     setup_engine,
     write_yaml,
 )
 
-IMAGE_TYPES = [("画像", "*.png *.jpg *.jpeg *.gif *.bmp *.tif *.tiff"), ("すべて", "*.*")]
+IMAGE_TYPES = [
+    ("画像・PDF・Excel", "*.png *.jpg *.jpeg *.gif *.bmp *.tif *.tiff *.pdf *.xlsx *.xlsm"),
+    ("画像", "*.png *.jpg *.jpeg *.gif *.bmp *.tif *.tiff"),
+    ("PDF", "*.pdf"),
+    ("Excel", "*.xlsx *.xlsm"),
+    ("すべて", "*.*"),
+]
 ENGINES = {"設定ファイルに従う": None, "RapidOCR": "rapidocr", "Tesseract": "tesseract"}
 ENGINE_LABELS = {"rapidocr": "RapidOCR", "tesseract": "Tesseract"}
 
@@ -333,8 +339,8 @@ class RunTab(ttk.Frame):
         self.view = ImageView(pane, on_redraw=self.draw_boxes)
         pane.add(self.view, weight=2)
 
-        self.paths: list[Path] = []
-        self.results: dict[str, tuple] = {}  # パス → (report または例外, 表示画像)
+        self.docs: dict[str, tuple[Path, int]] = {}  # 一覧の行 ID → (ファイル, ページ番号)。PDF はページごとに 1 行
+        self.results: dict[str, tuple] = {}  # 行 ID → (report または例外, 表示画像)
         self.current: str | None = None
         self.selected_row: Row | None = None
         self.refresh_configs()
@@ -351,16 +357,23 @@ class RunTab(ttk.Frame):
             self.config_var.set(names[0])
 
     def add_images(self) -> None:
-        for p in filedialog.askopenfilenames(title="検査成績書の画像を選択", filetypes=IMAGE_TYPES):
+        for p in filedialog.askopenfilenames(title="検査成績書のファイル（画像・PDF・Excel）を選択", filetypes=IMAGE_TYPES):
             p = Path(p)
-            if str(p) not in {str(x) for x in self.paths}:
-                self.paths.append(p)
-                self.files.insert("", "end", iid=str(p), text=p.name, values=("未判定",))
-        if self.paths and not self.files.selection():
-            self.files.selection_set(str(self.paths[0]))
+            try:
+                n = page_count(p)
+            except Exception as e:
+                show_error(e)
+                continue
+            for page in range(n):
+                iid = f"{p}#{page}"
+                if iid not in self.docs:
+                    self.docs[iid] = (p, page)
+                    self.files.insert("", "end", iid=iid, text=page_label(p, page, n), values=("未判定",))
+        if self.docs and not self.files.selection():
+            self.files.selection_set(next(iter(self.docs)))
 
     def clear(self) -> None:
-        self.paths.clear()
+        self.docs.clear()
         self.results.clear()
         self.files.delete(*self.files.get_children())
         self.table.set_rows([])
@@ -368,8 +381,8 @@ class RunTab(ttk.Frame):
         self.verdict.configure(text="", bg=self.verdict_bg)
 
     def run(self) -> None:
-        if not self.paths:
-            messagebox.showinfo("判定", "先に「画像を追加…」で検査成績書の画像を選んでください。")
+        if not self.docs:
+            messagebox.showinfo("判定", "先に「画像を追加…」で検査成績書の画像・PDF・Excel を選んでください。")
             return
         cfg_path = self.config_map.get(self.config_var.get())
         if not cfg_path:
@@ -382,35 +395,35 @@ class RunTab(ttk.Frame):
         except Exception as e:
             show_error(e)
             return
-        paths = list(self.paths)
+        docs = list(self.docs.items())
         self.run_button.configure(state="disabled")
-        self.progress.configure(text=f"判定中… (0/{len(paths)})")
+        self.progress.configure(text=f"判定中… (0/{len(docs)})")
 
         def step(i: int) -> None:
-            if i >= len(paths):
+            if i >= len(docs):
                 self.run_button.configure(state="normal")
-                self.progress.configure(text=f"完了 ({len(paths)} 件)")
+                self.progress.configure(text=f"完了 ({len(docs)} 件)")
                 return
-            path = paths[i]
+            iid, (path, page) = docs[i]
 
             def work():
                 try:
-                    rep = inspection_ocr.analyze(path, cfg, engine)
+                    rep = inspection_ocr.analyze(path, cfg, engine, page=page)
                 except LayoutError as e:
                     rep = e
-                img = rep.image if getattr(rep, "image", None) is not None else load_image_gray(path)
+                img = rep.image if getattr(rep, "image", None) is not None else load_source(path, page).gray
                 return rep, Image.fromarray(img)
 
             def done(result):
-                self.results[str(path)] = result
+                self.results[iid] = result
                 rep = result[0]
                 verdict = "読み取りエラー" if isinstance(rep, Exception) else rep.verdict
-                if self.files.exists(str(path)):
-                    self.files.item(str(path), values=(verdict,), tags=(verdict,))
-                if i == 0 or self.current == str(path) or not self.files.selection():
-                    self.files.selection_set(str(path))
+                if self.files.exists(iid):
+                    self.files.item(iid, values=(verdict,), tags=(verdict,))
+                if i == 0 or self.current == iid or not self.files.selection():
+                    self.files.selection_set(iid)
                 self.show_selected()
-                self.progress.configure(text=f"判定中… ({i + 1}/{len(paths)})")
+                self.progress.configure(text=f"判定中… ({i + 1}/{len(docs)})")
                 step(i + 1)
 
             def failed(e):
@@ -433,8 +446,8 @@ class RunTab(ttk.Frame):
             self.verdict.configure(text="未判定", bg=self.verdict_bg)
             self.table.set_rows([])
             try:
-                self.view.set_image(Image.open(sel[0]).convert("L"))
-            except OSError:
+                self.view.set_image(Image.fromarray(load_source(*self.docs[sel[0]]).gray))
+            except Exception:  # 開けないファイルは判定時にエラーとして表示する
                 self.view.set_image(None)
             return
         rep, img = result
@@ -938,8 +951,16 @@ class EditorTab(ttk.Frame):
     def new(self) -> None:
         if not self.confirm_discard():
             return
-        img = filedialog.askopenfilename(title="基準画像（記入済みの検査成績書）を選択", filetypes=IMAGE_TYPES)
+        img = filedialog.askopenfilename(
+            title="基準画像（記入済みの検査成績書の画像・PDF・Excel）を選択", filetypes=IMAGE_TYPES
+        )
         if not img:
+            return
+        try:
+            if page_count(Path(img)) > 1:
+                messagebox.showinfo("新規作成", "複数ページの PDF です。1 ページ目を基準画像にします。")
+        except Exception as e:
+            show_error(e)
             return
         name = simpledialog.askstring("新規作成", "様式名（例: 電子天秤検査成績書）", parent=self)
         if not name:
@@ -1390,7 +1411,7 @@ class EditorTab(ttk.Frame):
         if self.cfg.get("type") != "template":
             return
         if ask:
-            p = filedialog.askopenfilename(title="試し読みする画像", filetypes=IMAGE_TYPES)
+            p = filedialog.askopenfilename(title="試し読みするファイル（PDF は 1 ページ目）", filetypes=IMAGE_TYPES)
             if not p:
                 return
             img = Path(p)

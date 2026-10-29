@@ -7,8 +7,11 @@ OCR エンジンは Tesseract か RapidOCR（PP-OCRv6、ONNX Runtime、CPU）を
 帳票の様式は設定ファイル（configs/*.yaml）で切り替える。
 type: neomag はこのファイルの NeoMag 専用ロジック、type: template は template_ocr.py の汎用処理で読む。
 
+入力は画像・PDF・Excel（document_input.py）。PDF はページごとに 1 件として判定する。
+電子 PDF・Excel の文字（テキスト層）は OCR せずにそのまま読む。
+
 使い方:
-    uv run inspection_ocr.py 画像 [--config configs/neomag.yaml] [--engine rapidocr] [--debug]
+    uv run inspection_ocr.py ファイル [--config configs/neomag.yaml] [--engine rapidocr] [--debug]
 
 終了コード: 0=合格, 1=不合格, 2=要目視確認, 3=読み取りエラー
 """
@@ -24,6 +27,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from document_input import load_source, page_count
 from ocr_common import (  # noqa: F401  (Read 等は tests から io.X として参照される)
     CHECK,
     CONFIG_DIR,
@@ -38,7 +42,6 @@ from ocr_common import (  # noqa: F401  (Read 等は tests から io.X として
     judge,
     lines_in_cell,
     load_config,
-    load_image_gray,
     ocr_cell,
     page_lines,
     pad,
@@ -48,6 +51,7 @@ from ocr_common import (  # noqa: F401  (Read 等は tests から io.X として
 )
 
 SCALE = 4  # 低解像度の帳票を拡大してから OCR する倍率
+NEOMAG_WIDTH = 500  # 罫線検出の閾値はサンプル（幅 500px の GIF）の解像度が前提。PDF はこの幅で画像にする
 N_DATA_ROWS = 20
 
 COLUMNS = ["length", "width", "height", "gauss"]
@@ -64,9 +68,8 @@ SUMMARY_LABELS = {"max": "最大値", "min": "最小値", "ave": "平均値", "c
 
 # ---------------------------------------------------------------- 表構造の検出
 
-def load_gray(path: Path) -> np.ndarray:
-    gray = load_image_gray(path)
-    return cv2.resize(gray, None, fx=SCALE, fy=SCALE, interpolation=cv2.INTER_CUBIC)
+def load_gray(path: Path, page: int = 0) -> np.ndarray:
+    return load_source(path, page, width=NEOMAG_WIDTH).scaled(SCALE).gray
 
 
 def _cluster(indices: np.ndarray, gap: int) -> list[int]:
@@ -154,13 +157,17 @@ def read_document(
     path: Path,
     engine: str = "tesseract",
     debug_dir: Path | None = None,
+    page: int = 0,
 ) -> dict:
     """帳票画像から OCR 文字列（と信頼度）を取り出す。判定はしない。
 
     表構造（セル位置）は罫線から求め、セル内の文字を engine で読む。
     tesseract はセルごとに OCR し、rapidocr はページ全体を 1 回 OCR して行をセルに割り当てる。
+    テキスト層（電子 PDF の文字）がセル内にあれば、OCR の代わりにそれを読む。
     """
-    gray = load_gray(path)
+    doc = load_source(path, page, width=NEOMAG_WIDTH)
+    big = doc.scaled(SCALE)
+    gray, words = big.gray, big.words
     h_mask, v_mask = line_masks(gray)
     layout = locate_layout(horizontal_lines(h_mask))
 
@@ -170,16 +177,23 @@ def read_document(
     lot_col = _columns(v_mask, *layout.lot_row, 2)[1]
 
     boxes: list[tuple[int, int, int, int]] = []
-    lines = page_lines(load_image_gray(path), SCALE) if engine == "rapidocr" else None
+    lines = None  # RapidOCR のページ全体の結果。OCR が必要になったときに 1 回だけ読む
 
     def read(x: tuple[int, int], y: tuple[int, int]) -> Read:
+        nonlocal lines
         boxes.append((x[0], x[1], y[0], y[1]))
-        if lines is not None:
+        if words:
+            r = lines_in_cell(words, x[0], x[1], y[0], y[1], 3 * SCALE)
+            if r.text:
+                return r
+        if engine == "rapidocr":
+            if lines is None:
+                lines = page_lines(doc.gray, SCALE)
             return lines_in_cell(lines, x[0], x[1], y[0], y[1], 3 * SCALE)
         return ocr_cell(gray, x[0], x[1], y[0], y[1], 3 * SCALE)
 
     raw = {
-        "engine": engine,
+        "engine": f"テキスト層 + {engine}" if words else engine,
         "lot": read(lot_col, layout.lot_row),
         "magnetic": {k: read(c, layout.magnetic_row) for k, c in zip(MAGNETIC, mag_cols)},
         "spec": {k: read(c, layout.spec_row) for k, c in zip(COLUMNS, table_cols) if k != "gauss"},
@@ -196,7 +210,8 @@ def read_document(
         for x0, x1, y0, y1 in boxes:
             m = 3 * SCALE
             cv2.rectangle(vis, (x0 + m, y0 + m), (x1 - m, y1 - m), (0, 0, 255), 2)
-        cv2.imencode(".png", vis)[1].tofile(debug_dir / f"{path.stem}_cells.png")  # 日本語パス対応
+        name = f"{Path(path).stem}{f'_p{page + 1}' if page else ''}_cells.png"
+        cv2.imencode(".png", vis)[1].tofile(debug_dir / name)  # 日本語パス対応
     return raw
 
 
@@ -363,20 +378,20 @@ def print_report(path: Path, rep: Report) -> None:
     print(f"■ 総合判定: {rep.verdict}")
 
 
-def analyze(path: Path, cfg: dict, engine: str, debug_dir: Path | None = None):
+def analyze(path: Path, cfg: dict, engine: str, debug_dir: Path | None = None, page: int = 0):
     """設定の type に応じて読み取り・判定し、Report（verdict と rows() を持つ）を返す。
 
-    構造を検出できなければ LayoutError。
+    page は PDF のページ番号（0 始まり）。構造を検出できなければ LayoutError。
     """
     if cfg.get("type", "neomag") == "template":
         import template_ocr  # NeoMag だけ使う場合は読み込まない
 
-        return template_ocr.analyze(path, cfg, engine, debug_dir)
-    raw = read_document(path, engine, debug_dir)
+        return template_ocr.analyze(path, cfg, engine, debug_dir, page)
+    raw = read_document(path, engine, debug_dir, page)
     return evaluate(raw, cfg)
 
 
-def report(path: Path, rep) -> None:
+def report(path: Path | str, rep) -> None:
     if isinstance(rep, Report):
         print_report(path, rep)
     else:
@@ -387,7 +402,7 @@ def report(path: Path, rep) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="検査成績書の OCR 良否判定（ローカル処理）")
-    ap.add_argument("images", nargs="+", type=Path, help="検査成績書の画像ファイル")
+    ap.add_argument("images", nargs="+", type=Path, help="検査成績書のファイル（画像・PDF・Excel）")
     ap.add_argument(
         "--config", type=Path, default=CONFIG_DIR / "neomag.yaml",
         help="様式の設定ファイル（省略時は configs/neomag.yaml）",
@@ -402,16 +417,18 @@ def main(argv: list[str] | None = None) -> int:
 
     codes = {"合格": 0, "不合格": 1, "要目視確認": 2}
     worst = 0
-    for i, path in enumerate(args.images):
+    docs = [(path, page, n) for path in args.images for n in [page_count(path)] for page in range(n)]
+    for i, (path, page, n) in enumerate(docs):
         if i:
             print("\n" + "=" * 64 + "\n")
+        label = f"{path} ({page + 1}/{n} ページ)" if n > 1 else str(path)
         try:
-            rep = analyze(path, cfg, engine, Path("debug") if args.debug else None)
+            rep = analyze(path, cfg, engine, Path("debug") if args.debug else None, page)
         except LayoutError as e:
-            print(f"{path}: 表の構造を検出できません - {e}", file=sys.stderr)
+            print(f"{label}: 表の構造を検出できません - {e}", file=sys.stderr)
             worst = max(worst, 3)
             continue
-        report(path, rep)
+        report(label, rep)
         worst = max(worst, codes[rep.verdict])
     return worst
 

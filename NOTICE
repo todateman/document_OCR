@@ -10,6 +10,7 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
 
 1. サンプル画像・基準画像
    sample/inspection_sample.gif、sample/denshitenbin_kensa_seisekisho01.jpg、
+   sample/denshitenbin_kensa_seisekisho01_digital.pdf、sample/denshitenbin_kensa_seisekisho01_scan.pdf、
    configs/denshitenbin.jpg、および docs/images/ のスクリーンショットに写っている
    帳票の内容は、各帳票の作成者に権利があります。
 
@@ -17,6 +18,8 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
    - RapidOCR: Apache-2.0。同梱の PP-OCRv6 モデル（PaddleOCR、Baidu）も Apache-2.0
      （https://huggingface.co/PaddlePaddle/PP-OCRv6_small_rec）。
    - ONNX Runtime: MIT
+   - pypdfium2（PDF の読み込み）: BSD-3-Clause / Apache-2.0。同梱の PDFium（Google）は BSD-3-Clause ほか
+   - openpyxl（Excel の読み込み）: MIT
    - Tesseract OCR: Apache-2.0
    - NumPy (BSD-3-Clause ほか)、OpenCV (Apache-2.0)、Pillow (MIT-CMU)、
      PyYAML (MIT)、pytesseract (Apache-2.0) ほか。各パッケージのライセンスに従います。
