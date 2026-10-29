@@ -54,7 +54,7 @@ def page(cfg):
 
 @pytest.fixture(scope="module")
 def report(page, cfg):
-    return t.evaluate(page, cfg, "indra")
+    return t.evaluate(page, cfg, "rapidocr")
 
 
 def items(rep):
@@ -99,7 +99,7 @@ def test_alignment_handles_distortion(kind, cfg, tmp_path):
     gray = np.array(Image.open(SAMPLE).convert("L"))
     p = tmp_path / f"{kind}.png"
     Image.fromarray(_distort(gray, kind)).save(p)
-    rep = t.analyze(p, cfg, "indra")
+    rep = t.analyze(p, cfg, "rapidocr")
     got = items(rep)
     # 判定に使う値（数値・OK 欄・マーク）は元画像と同じに読めるか、読めなければ要確認になること
     # （劣化で信頼度が下がって要確認になるのは正しい動作。誤読のまま OK になってはいけない）
@@ -116,7 +116,7 @@ def test_alignment_handles_distortion(kind, cfg, tmp_path):
 
 def test_other_form_is_rejected(cfg):
     with pytest.raises(LayoutError):
-        t.analyze(ROOT / "sample" / "inspection_sample.gif", cfg, "indra")
+        t.analyze(ROOT / "sample" / "inspection_sample.gif", cfg, "rapidocr")
 
 
 def _with_marks(tmp_path, name, edit):
@@ -136,14 +136,14 @@ def test_mark_other_option_is_ng(cfg, tmp_path):
         g[374:407, 740:840] = 255  # 「合格」の○を消す
         _circle_fail(g)
 
-    rep = t.analyze(_with_marks(tmp_path, "fail", edit), cfg, "indra")
+    rep = t.analyze(_with_marks(tmp_path, "fail", edit), cfg, "rapidocr")
     cell = items(rep)["総合判定"]
     assert (cell.text, cell.status) == ("不合格", NG)
     assert rep.verdict == "不合格"
 
 
 def test_mark_on_both_options_needs_check(cfg, tmp_path):
-    rep = t.analyze(_with_marks(tmp_path, "both", _circle_fail), cfg, "indra")
+    rep = t.analyze(_with_marks(tmp_path, "both", _circle_fail), cfg, "rapidocr")
     assert items(rep)["総合判定"].status == CHECK
     assert rep.verdict == "要目視確認"
 
@@ -152,7 +152,7 @@ def test_no_mark_needs_check(cfg, tmp_path):
     def edit(g):
         g[374:407, 740:840] = 255
 
-    rep = t.analyze(_with_marks(tmp_path, "none", edit), cfg, "indra")
+    rep = t.analyze(_with_marks(tmp_path, "none", edit), cfg, "rapidocr")
     assert items(rep)["総合判定"].status == CHECK
 
 
@@ -160,7 +160,7 @@ def test_narrow_spec_detects_ng(page, cfg):
     cfg = copy.deepcopy(cfg)
     f = next(f for f in cfg["fields"] if f["name"] == "四隅 調整後")
     f["min"], f["max"] = -0.5, 0.5
-    rep = t.evaluate(page, cfg, "indra")
+    rep = t.evaluate(page, cfg, "rapidocr")
     ng = [it.name for it in rep.items if it.cell.status == NG]
     assert ng == ["四隅 調整後 右後"]  # -1
     assert rep.verdict == "不合格"

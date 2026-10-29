@@ -30,10 +30,10 @@ from ocr_common import (
     LayoutError,
     Read,
     Row,
-    indra_page_lines,
     lines_in_cell,
     load_image_gray,
     ocr_cell,
+    page_lines,
     pad,
     parse_number,
     verdict_of,
@@ -404,7 +404,7 @@ def read_targets(
 ) -> list[tuple[dict, list[tuple[Target, Read]]]]:
     """位置合わせ済みの画像から各読み取り単位の OCR 結果を取り出す（判定はしない）。"""
     fields = expand(cfg, ref)
-    lines = indra_page_lines(gray, cfg.get("indra_model_dir")) if engine == "indra" else None
+    lines = page_lines(gray) if engine == "rapidocr" else None
     margin = max(2, char_h // 6)
     out = []
     for f, targets in fields:

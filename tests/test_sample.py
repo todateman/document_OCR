@@ -38,7 +38,7 @@ def cfg():
     return io.load_config(ROOT / "configs" / "neomag.yaml")
 
 
-@pytest.fixture(scope="module", params=["tesseract", "indra"])
+@pytest.fixture(scope="module", params=["tesseract", "rapidocr"])
 def raw(request, cfg):
     if request.param == "tesseract":
         try:
@@ -93,7 +93,7 @@ def test_line_spanning_cells_flagged():
     assert io.parse_number(read, 0, 60).status == io.CHECK
 
 
-def test_spaces_in_indra_line_removed():
+def test_spaces_in_page_line_removed():
     s = io.SCALE
     lines = [((10 * s, 0, 30 * s, 10 * s), "1. 99", 93.0)]
     read = io.lines_in_cell(lines, 0, 40 * s, 0, 12 * s)

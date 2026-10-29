@@ -77,6 +77,8 @@ def load_config(path: Path) -> dict:
     path = Path(path)
     cfg = read_yaml(path)
     merged = {**load_settings(), **{k: v for k, v in cfg.items() if v is not None}}
+    if merged.get("engine") == "indra":  # indra-ocr（廃止）を使っていた頃の様式
+        merged["engine"] = "rapidocr"
     merged["_dir"] = str(path.resolve().parent)  # 基準画像など相対パスの起点
     return merged
 
@@ -144,26 +146,36 @@ def ocr_cell(
 
 
 @functools.cache
-def _indra_converter(model_dir: str | None):
+def _rapidocr_engine():
     try:
-        import indra_ocr  # Tesseract 使用時は読み込まない
+        from rapidocr import ModelType, OCRVersion, RapidOCR  # Tesseract 使用時は読み込まない
     except ImportError as e:
         print(
-            "indra-ocr が見つかりません。uv の環境で実行してください:\n"
-            "    uv run inspection_ocr.py <画像> --engine indra",
+            "RapidOCR が見つかりません。uv の環境で実行してください:\n"
+            "    uv run inspection_ocr.py <画像> --engine rapidocr",
             file=sys.stderr,
         )
         raise SystemExit(3) from e  # 1 は「不合格」と紛らわしいので読み取りエラーの 3
 
-    return indra_ocr.load(path=model_dir, mode="ocr")
+    # PP-OCRv6 small: 1 つのモデルで日本語・英数字を読む。モデルはパッケージに同梱されていて通信しない
+    # （medium は劣化画像にやや強いが約 5 倍遅く、初回にダウンロードが要る）
+    params = {"Global.log_level": "error"}
+    for task in ("Det", "Rec"):
+        params[f"{task}.ocr_version"] = OCRVersion.PPOCRV6
+        params[f"{task}.model_type"] = ModelType.SMALL
+    return RapidOCR(params=params)
 
 
-def indra_page_lines(
-    gray: np.ndarray, model_dir: str | None, scale: float = 1
-) -> list[tuple[tuple[float, ...], str, float]]:
-    """ページ全体を indra-ocr で読み、(scale 倍した座標の box, 文字列, 信頼度 0〜100) を返す。"""
-    page = _indra_converter(model_dir).ocr(gray)
-    return [(tuple(v * scale for v in ln.box), ln.text, float(ln.conf) * 100) for ln in page.lines]
+def page_lines(gray: np.ndarray, scale: float = 1) -> list[tuple[tuple[float, ...], str, float]]:
+    """ページ全体を RapidOCR で読み、(scale 倍した座標の box, 文字列, 信頼度 0〜100) を返す。"""
+    res = _rapidocr_engine()(cv2.cvtColor(gray, cv2.COLOR_GRAY2BGR))
+    if res.boxes is None:  # 文字が 1 つも無い
+        return []
+    out = []
+    for quad, text, score in zip(res.boxes, res.txts, res.scores):
+        (x0, y0), (x1, y1) = quad.min(axis=0), quad.max(axis=0)  # 4 頂点 → 外接矩形
+        out.append((tuple(float(v) * scale for v in (x0, y0, x1, y1)), text, float(score) * 100))
+    return out
 
 
 def lines_in_cell(lines, x0: int, x1: int, y0: int, y1: int, margin: int = 12) -> Read:
@@ -180,7 +192,7 @@ def lines_in_cell(lines, x0: int, x1: int, y0: int, y1: int, margin: int = 12) -
     hits = sorted((ln for ln in lines if inside(ln)), key=lambda ln: ln[0][0])
     if not hits:
         return Read("", -1)
-    # indra-ocr は "1. 99" のように数字の間へ空白を入れることがあるので除く
+    # ページ全体の OCR は "1. 99" のように数字の間へ空白を入れることがあるので除く
     text = "".join(t for _, t, _ in hits).replace(" ", "")
     read = Read(text, min(c for _, _, c in hits))
     # 1 行が縦罫線をまたいでいる = 隣のセルの文字と結合されている

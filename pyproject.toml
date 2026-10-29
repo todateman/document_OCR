@@ -5,12 +5,13 @@ requires-python = ">=3.11"
 license = "Apache-2.0"
 license-files = ["LICENSE", "NOTICE"]
 dependencies = [
-    "indra-ocr>=1.1.2",
     "numpy>=2.4.6",
+    "onnxruntime>=1.31.1",
     "opencv-python-headless>=5.0.0.93",
     "pillow>=13.0.0",
     "pytesseract>=0.3.13",
     "pyyaml>=6.0.3",
+    "rapidocr>=3.10.0",
 ]
 
 [dependency-groups]

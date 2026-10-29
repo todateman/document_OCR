@@ -44,12 +44,12 @@ uv sync
 
 | エンジン | 準備 |
 | --- | --- |
-| indra-ocr | `uv sync` で導入済み。初回実行時にモデル（約 76MB）を Hugging Face からダウンロードし、以降はキャッシュを使うため通信しない |
+| RapidOCR | `uv sync` で導入済み。PaddleOCR の PP-OCRv6 モデル（約 32MB）がパッケージに同梱されているため、実行時に通信しない |
 | Tesseract | 本体を別途インストール: `winget install UB-Mannheim.TesseractOCR`。日本語の欄を読むにはインストール時に Japanese の言語データも追加する |
 
-**日本語を含む書類は indra-ocr を推奨します**（電子天秤のサンプルでは indra-ocr は全項目を正しく読み約 1 秒、Tesseract は 13 項目が要確認になり約 12 秒でした）。
+**日本語を含む書類は RapidOCR を推奨します**（電子天秤のサンプルでは RapidOCR は全項目を正しく読み、Tesseract は 12 項目が要確認になりました。詳しくは「[エンジンの比較](#エンジンの比較)」）。
 
-ネットワークにつながらない PC で indra-ocr を使う場合は、別の PC でダウンロードしたモデルフォルダをコピーし、GUI の「ファイル → 共通設定」（`settings.yaml` の `indra_model_dir`）で指定してください。
+どちらのエンジンも、ライセンスは商用利用が無償で可能なもの（Apache-2.0）です。
 
 ## GUI の使い方
 
@@ -68,7 +68,7 @@ uv sync
 
 1. **様式**：書類の種類を選びます（`configs` フォルダの設定ファイルが一覧に出ます）。
 2. **画像を追加…**：検査成績書の画像を選びます。複数まとめて選べます。「一覧を空にする」でやり直せます。
-3. **▶ 判定実行**：読み取りと判定を始めます。1 枚あたり indra-ocr で約 1 秒、Tesseract で十数秒かかります。
+3. **▶ 判定実行**：読み取りと判定を始めます。1 枚あたり RapidOCR で約 2 秒、Tesseract で数秒〜十数秒かかります。
 4. **画像ファイルの一覧**：ファイルごとの総合判定が色付きで出ます（緑 = 合格、赤 = 不合格、橙 = 要目視確認、灰 = 読み取りエラー）。行をクリックすると、そのファイルの結果に切り替わります。
 5. **総合判定**：選んだファイルの判定結果です。
 6. **項目の一覧**：項目ごとの読取値・判定・理由です。NG は赤、要確認は橙の背景になります。「NG・要確認だけ表示」にチェックを入れると、問題のある項目だけに絞れます。
@@ -180,22 +180,22 @@ uv sync
 ```powershell
 uv run inspection_ocr.py sample/inspection_sample.gif                         # NeoMag 様式（既定）
 uv run inspection_ocr.py sample/denshitenbin_kensa_seisekisho01.jpg --config configs/denshitenbin.yaml
-uv run inspection_ocr.py scans/a.gif scans/b.gif --engine indra               # 複数ファイル、エンジン指定
+uv run inspection_ocr.py scans/a.gif scans/b.gif --engine rapidocr            # 複数ファイル、エンジン指定
 uv run inspection_ocr.py scans/a.gif --debug                                  # 読み取り位置を debug/ に画像出力
 ```
 
-> `python inspection_ocr.py ...` で実行するとシステムの Python が使われ、indra-ocr が見つかりません。`uv run` を使うか、先に `.venv\Scripts\Activate.ps1` で `.venv` を有効にしてください。
+> `python inspection_ocr.py ...` で実行するとシステムの Python が使われ、RapidOCR が見つかりません。`uv run` を使うか、先に `.venv\Scripts\Activate.ps1` で `.venv` を有効にしてください。
 
 | オプション | 内容 |
 | --- | --- |
 | `--config パス` | 様式の設定ファイル（省略時は `configs/neomag.yaml`） |
-| `--engine tesseract\|indra` | OCR エンジン（省略時は設定ファイルの `engine`） |
+| `--engine tesseract\|rapidocr` | OCR エンジン（省略時は設定ファイルの `engine`） |
 | `--debug` | 読み取った位置を枠で描いた画像を `debug/` に保存 |
 
 ### 出力例（NeoMag 様式）
 
 ```text
-ファイル : sample\inspection_sample.gif  (OCR: indra)
+ファイル : sample\inspection_sample.gif  (OCR: rapidocr)
 ロットNo.: NN14092301
 
 磁気特性値: Br=10.44  Hcb=9.92  Hcj=22.49  BHmax=26.05
@@ -241,7 +241,6 @@ uv run inspection_ocr.py scans/a.gif --debug                                  # 
 ```yaml
 tesseract_cmd: null        # null なら自動検出
 tesseract_lang: jpn+eng    # 文字項目を Tesseract で読むときの言語
-indra_model_dir: null      # null なら初回ダウンロード＆キャッシュ
 ```
 
 ### configs/neomag.yaml（NeoMag 専用）
@@ -249,7 +248,7 @@ indra_model_dir: null      # null なら初回ダウンロード＆キャッシ�
 ```yaml
 type: neomag
 name: NeoMag 検査成績書
-engine: tesseract          # tesseract / indra
+engine: tesseract          # tesseract / rapidocr
 min_confidence: 60         # これ未満の OCR 信頼度は要確認
 
 columns:
@@ -271,7 +270,7 @@ magnetic: {}               # 例: Br: {min: 10.0, max: 11.0}
 type: template
 name: 電子天秤検査成績書
 reference_image: denshitenbin.jpg   # 基準画像（設定ファイルと同じフォルダ）
-engine: indra
+engine: rapidocr
 min_confidence: 60
 fields:
 - name: 外観・機能 外乱等
@@ -303,12 +302,12 @@ fields:
 ### NeoMag 専用
 
 1. **表構造の検出** — 罫線を検出し、3 か所の二重罫線（「測定値」行の下 / No.20 の下 / c/n の下）を基準に各行・各列の位置を求めます。スキャン時の位置ずれには追従しますが、様式が変わると検出できません。
-2. **OCR** — Tesseract はセルごとに、indra-ocr はページ全体を 1 回読んで各行をセルに割り当てます。
+2. **OCR** — Tesseract はセルごとに、RapidOCR はページ全体を 1 回読んで各行をセルに割り当てます。
 3. **良否判定** — 規格の範囲内なら OK、外れたら NG。
 4. **読み誤りの検出** — 次の場合はその値を「要確認」にします。
    - 数字以外の文字が混じっている、小数桁数が設定と違う
    - OCR の信頼度が `min_confidence` 未満
-   - indra-ocr で、1 行が隣のセルまでつながって読まれた
+   - RapidOCR で、1 行が隣のセルまでつながって読まれた
    - 読み取った 20 値から再計算した最大値・最小値・平均値が、帳票の値と合わない
    - 帳票の c/n と、判定した NG 件数が合わない
 
@@ -323,24 +322,38 @@ fields:
 
 ## エンジンの比較
 
-NeoMag サンプル画像と、それを人工的に劣化させた画像での正読数（全 80 値中）です。
+商用利用が無償で可能なローカル OCR として RapidOCR（PP-OCRv6 small）と NDLOCR-Lite（国立国会図書館、CC BY 4.0）を Tesseract と比べ、RapidOCR を採用しました。
 
-| 画像 | Tesseract | indra-ocr |
-| --- | --- | --- |
-| 元画像 | 80 | 80 |
-| ノイズ | 38 | 76 |
-| JPEG 高圧縮 | 56 | 78 |
-| ぼかし | 2 | 80 |
-| 0.8 倍に縮小 | 11 | 80 |
-| 0.3° 傾き | 65 | 80 |
+NeoMag サンプル画像と、それを人工的に劣化させた画像での計測値の正読数（全 80 値中）です。
 
-処理時間は 1 枚あたり、Tesseract が 10〜20 秒、indra-ocr が約 0.5 秒（初回はモデル読み込みで約 2 秒）でした。どの条件でも、誤読があるのに「合格」と出たケースはありませんでした。
+| 画像 | Tesseract | RapidOCR | NDLOCR-Lite |
+| --- | --- | --- | --- |
+| 元画像 | 80 | 80 | 80 |
+| ノイズ | 38 | 78 | 77 |
+| JPEG 高圧縮 | 38 | 74 | 72 |
+| ぼかし | 7 | 80 | 79 |
+| 0.8 倍に縮小 | 11 | 80 | 80 |
+| 0.3° 傾き | 44 | 80 | 80 |
 
-電子天秤サンプル（汎用様式）では、回転・平行移動・縮小・射影歪み・JPEG 高圧縮・ぼかし・ノイズを加えた画像でも位置合わせとマーク判定は正しく、判定に使う値の誤読はすべて要確認になりました。
+電子天秤サンプル（汎用様式）での、目視で確認した 20 項目の正読数と、NG または要確認になった項目数（全 87 項目中。元の帳票はすべて OK）です。
+
+| 画像 | Tesseract | RapidOCR | NDLOCR-Lite |
+| --- | --- | --- | --- |
+| 元画像 | 15（NG・要確認 12） | 20（0） | 13（26） |
+| 回転・平行移動 | 17（11） | 20（0） | 14（25） |
+| 0.7 倍に縮小 | 16（10） | 20（0） | 14（26） |
+| 射影歪み | 17（10） | 20（0） | 15（24） |
+| JPEG 高圧縮 | 17（11） | 20（0） | 15（24） |
+| ノイズ | 12（21） | 20（0） | 15（22） |
+| ぼかし | 16（17） | 19（2） | 15（25） |
+
+- RapidOCR と Tesseract は、読み誤った値がすべて要確認になり、総合判定が「要目視確認」になりました（誤読を見逃して「合格」と出たケースはありませんでした）。
+- NDLOCR-Lite は NeoMag 様式では RapidOCR と同等でしたが、電子天秤の様式では `-1` を `11`、`0` を `10` のように読み、規格外の NG として扱われました（ノイズを加えた画像では総合判定が「不合格」）。
+- 処理時間は 1 枚あたり（Apple Silicon の Mac で計測）、RapidOCR が約 2 秒、Tesseract が約 4 秒、NDLOCR-Lite が約 3 秒でした。RapidOCR の上位モデル（PP-OCRv6 medium）は劣化画像でわずかに正読数が増えますが、約 10 秒かかるため採用していません。
+- 劣化画像でも、位置合わせとマーク判定はどのエンジンでも正しく行えました。
 
 ## 注意事項
 
-- **indra-ocr のライセンス**: コードは Apache 2.0 ですが、モデルの重みは独自条件付きの OpenRAIL-M です。無償利用は研究・個人利用と、資金調達額または売上が 2,000 万ドル未満の企業に限られます。業務で使う前に、[ライセンス条件](https://huggingface.co/datalab-to/indra-ocr/blob/main/LICENSE)を確認してください。
 - **見逃しの可能性**: 形式が正しく規格内に収まる誤読（例: `1310` → `1330`）は、検出できないことがあります（NeoMag 様式では最大値・最小値・平均値との照合で一部を検出します）。重要な判定では、要目視確認になったものだけでなく、定期的に原本との突き合わせを行ってください。
 - **手書きマーク**: ○・チェック・斜線のように文字より大きく書かれた印を検出します。文字の横に小さく書いたチェックなどは検出できないことがあります。新しい様式では、記入パターンの異なる画像で試し読みし、スコアを見て閾値を調整してください。
 - 基準画像（`configs/` 内の画像）と `--debug` で出力した画像は検査成績書の内容を含みます。取り扱いに注意し、`debug/` は不要になったら削除してください。
@@ -357,7 +370,7 @@ uv run pytest tests
 
 このツールのコードは [Apache License 2.0](LICENSE) で提供します（Copyright 2026 Tomohiro Kusu）。
 
-サンプル画像・基準画像に写っている帳票の内容と、OCR エンジン（indra-ocr のモデルの重み、Tesseract）や依存パッケージはこのライセンスの対象外で、それぞれの権利者の条件に従います。詳しくは [NOTICE](NOTICE) を参照してください。
+サンプル画像・基準画像に写っている帳票の内容と、OCR エンジン（RapidOCR と PP-OCRv6 のモデル、Tesseract）や依存パッケージはこのライセンスの対象外で、それぞれの権利者の条件に従います。詳しくは [NOTICE](NOTICE) を参照してください。
 
 ## ファイル構成
 

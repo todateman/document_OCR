@@ -43,8 +43,8 @@ from ocr_common import (
 )
 
 IMAGE_TYPES = [("画像", "*.png *.jpg *.jpeg *.gif *.bmp *.tif *.tiff"), ("すべて", "*.*")]
-ENGINES = {"設定ファイルに従う": None, "indra-ocr": "indra", "Tesseract": "tesseract"}
-ENGINE_LABELS = {"indra": "indra-ocr", "tesseract": "Tesseract"}
+ENGINES = {"設定ファイルに従う": None, "RapidOCR": "rapidocr", "Tesseract": "tesseract"}
+ENGINE_LABELS = {"rapidocr": "RapidOCR", "tesseract": "Tesseract"}
 
 STATUS_COLOR = {OK: "#2e7d32", NG: "#c62828", CHECK: "#e65100"}
 STATUS_BG = {OK: "", NG: "#ffcdd2", CHECK: "#ffe0b2"}
@@ -65,7 +65,7 @@ def run_in_background(widget: tk.Misc, func, on_done, on_error=None) -> None:
     def work():
         try:
             q.put((True, func()))
-        except BaseException as e:  # SystemExit（indra-ocr 未導入）も画面に出す
+        except BaseException as e:  # SystemExit（RapidOCR 未導入）も画面に出す
             q.put((False, e))
 
     def poll():
@@ -89,7 +89,7 @@ def show_error(e: BaseException) -> None:
     if isinstance(e, (LayoutError, FileNotFoundError)):
         messagebox.showerror("エラー", str(e))
     elif isinstance(e, SystemExit):
-        messagebox.showerror("エラー", "indra-ocr が見つかりません。uv の環境（OCR判定.bat）から起動してください。")
+        messagebox.showerror("エラー", "RapidOCR が見つかりません。uv の環境（OCR判定.bat）から起動してください。")
     else:
         messagebox.showerror("エラー", "".join(traceback.format_exception_only(type(e), e)))
 
@@ -844,7 +844,7 @@ class EditorTab(ttk.Frame):
         """様式名・エンジン・最小信頼度（・説明）を 1〜2 行で並べる。"""
         cfg = self.cfg
         name = tk.StringVar(value=cfg.get("name", ""))
-        eng = tk.StringVar(value=ENGINE_LABELS.get(cfg.get("engine", "indra"), cfg.get("engine", "")))
+        eng = tk.StringVar(value=ENGINE_LABELS.get(cfg.get("engine", "rapidocr"), cfg.get("engine", "")))
         conf = tk.StringVar(value=fmt_num(cfg.get("min_confidence", 60)))
         ttk.Label(frame, text="様式名").grid(row=0, column=0, sticky="w")
         ttk.Entry(frame, textvariable=name, width=36).grid(row=0, column=1, sticky="ew", padx=(4, 16))
@@ -855,7 +855,7 @@ class EditorTab(ttk.Frame):
         conf_entry = ttk.Entry(frame, textvariable=conf, width=6)
         conf_entry.grid(row=0, column=5, padx=4)
         ttk.Label(frame, foreground="#666",
-                  text="日本語の欄があれば indra-ocr を推奨。OCR の信頼度 (0〜100) が最小信頼度未満の値は要確認").grid(
+                  text="日本語の欄があれば RapidOCR を推奨。OCR の信頼度 (0〜100) が最小信頼度未満の値は要確認").grid(
             row=1, column=1, columnspan=5, sticky="w")
         frame.columnconfigure(1, weight=1)
 
@@ -954,7 +954,7 @@ class EditorTab(ttk.Frame):
         if img.resolve() != ref.resolve():
             shutil.copyfile(img, ref)  # 設定ファイルと同じフォルダに基準画像を置く
         self.cfg = {"type": "template", "name": name, "reference_image": ref.name,
-                    "engine": "indra", "min_confidence": 60, "fields": []}
+                    "engine": "rapidocr", "min_confidence": 60, "fields": []}
         self.path = path
         self.build()
         self.save()
@@ -1397,7 +1397,7 @@ class EditorTab(ttk.Frame):
         else:
             img = template_ocr.reference_path(merged_config(self.cfg, self.path))
         cfg = merged_config(copy.deepcopy(self.cfg), self.path)
-        engine = cfg.get("engine", "indra")
+        engine = cfg.get("engine", "rapidocr")
         try:
             setup_engine(engine, cfg)
         except Exception as e:
@@ -1451,7 +1451,6 @@ class SettingsDialog(tk.Toplevel):
         rows = [
             ("tesseract_cmd", "Tesseract の場所", "file", "空欄なら自動で探します"),
             ("tesseract_lang", "Tesseract の言語", None, "文字項目を読むときの言語（日本語は jpn の言語データが必要）"),
-            ("indra_model_dir", "indra-ocr のモデル", "dir", "空欄なら初回にダウンロードして保存（ネットワークの無い PC ではフォルダを指定）"),
         ]
         for i, (key, label, browse, hint) in enumerate(rows):
             ttk.Label(f, text=label).grid(row=2 * i, column=0, sticky="w", padx=(0, 6), pady=(6, 0))

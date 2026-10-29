@@ -1,14 +1,14 @@
 """検査成績書の計測値をローカル OCR で読み取り、良否判定する。
 
-OCR エンジンは Tesseract か indra-ocr（ONNX Runtime、CPU）を選べる。
+OCR エンジンは Tesseract か RapidOCR（PP-OCRv6、ONNX Runtime、CPU）を選べる。
 どちらも画像は外部に送信せず、すべてこの PC 上で処理する
-（indra-ocr は初回のみモデルを Hugging Face からダウンロードする）。
+（RapidOCR のモデルはパッケージに同梱されていて、通信しない）。
 
 帳票の様式は設定ファイル（configs/*.yaml）で切り替える。
 type: neomag はこのファイルの NeoMag 専用ロジック、type: template は template_ocr.py の汎用処理で読む。
 
 使い方:
-    uv run inspection_ocr.py 画像 [--config configs/neomag.yaml] [--engine indra] [--debug]
+    uv run inspection_ocr.py 画像 [--config configs/neomag.yaml] [--engine rapidocr] [--debug]
 
 終了コード: 0=合格, 1=不合格, 2=要目視確認, 3=読み取りエラー
 """
@@ -35,12 +35,12 @@ from ocr_common import (  # noqa: F401  (Read 等は tests から io.X として
     Row,
     decimals_of,
     find_tesseract,
-    indra_page_lines,
     judge,
     lines_in_cell,
     load_config,
     load_image_gray,
     ocr_cell,
+    page_lines,
     pad,
     parse_number,
     setup_engine,
@@ -154,12 +154,11 @@ def read_document(
     path: Path,
     engine: str = "tesseract",
     debug_dir: Path | None = None,
-    indra_model_dir: str | None = None,
 ) -> dict:
     """帳票画像から OCR 文字列（と信頼度）を取り出す。判定はしない。
 
     表構造（セル位置）は罫線から求め、セル内の文字を engine で読む。
-    tesseract はセルごとに OCR し、indra はページ全体を 1 回 OCR して行をセルに割り当てる。
+    tesseract はセルごとに OCR し、rapidocr はページ全体を 1 回 OCR して行をセルに割り当てる。
     """
     gray = load_gray(path)
     h_mask, v_mask = line_masks(gray)
@@ -171,7 +170,7 @@ def read_document(
     lot_col = _columns(v_mask, *layout.lot_row, 2)[1]
 
     boxes: list[tuple[int, int, int, int]] = []
-    lines = indra_page_lines(load_image_gray(path), indra_model_dir, SCALE) if engine == "indra" else None
+    lines = page_lines(load_image_gray(path), SCALE) if engine == "rapidocr" else None
 
     def read(x: tuple[int, int], y: tuple[int, int]) -> Read:
         boxes.append((x[0], x[1], y[0], y[1]))
@@ -373,7 +372,7 @@ def analyze(path: Path, cfg: dict, engine: str, debug_dir: Path | None = None):
         import template_ocr  # NeoMag だけ使う場合は読み込まない
 
         return template_ocr.analyze(path, cfg, engine, debug_dir)
-    raw = read_document(path, engine, debug_dir, cfg.get("indra_model_dir"))
+    raw = read_document(path, engine, debug_dir)
     return evaluate(raw, cfg)
 
 
@@ -393,7 +392,7 @@ def main(argv: list[str] | None = None) -> int:
         "--config", type=Path, default=CONFIG_DIR / "neomag.yaml",
         help="様式の設定ファイル（省略時は configs/neomag.yaml）",
     )
-    ap.add_argument("--engine", choices=["tesseract", "indra"], help="OCR エンジン（既定は設定ファイルの engine）")
+    ap.add_argument("--engine", choices=["tesseract", "rapidocr"], help="OCR エンジン（既定は設定ファイルの engine）")
     ap.add_argument("--debug", action="store_true", help="セル切り出し位置を debug/ に画像出力")
     args = ap.parse_args(argv)
 
