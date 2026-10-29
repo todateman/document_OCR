@@ -1,0 +1,28 @@
+# 検査成績書 OCR 良否判定の設定
+
+# OCR エンジン: tesseract / indra（コマンドラインの --engine で上書き可）
+engine: tesseract
+
+# Tesseract の実行ファイル。null なら PATH / 標準インストール先から自動検出
+tesseract_cmd: null
+
+# indra-ocr のモデルフォルダ。null なら初回に Hugging Face からダウンロードしてキャッシュ
+# （2 回目以降は通信しない）。ネットワークの無い PC ではモデルを置いたフォルダを指定する
+indra_model_dir: null
+
+# これ未満の OCR 信頼度 (0-100) のセルは「要確認」にする
+min_confidence: 60
+
+# 計測表の各列
+#   decimals: 計測値の小数桁数（桁数が違えば OCR 誤読とみなし「要確認」）
+#   spec: from_document … 帳票の「検査規格」欄を読み取って使う
+#         {min: 下限, max: 上限} … 指定値を使う（帳票より優先、境界値は合格）
+columns:
+  length: {decimals: 2, spec: from_document}
+  width:  {decimals: 2, spec: from_document}
+  height: {decimals: 2, spec: from_document}
+  gauss:  {decimals: 0, spec: {min: 1200, max: 1400}}  # ← 実際の規格値に設定してください
+
+# 磁気特性値 (Br, Hcb, Hcj, BHmax) の規格。未設定の項目は読み取り表示のみ
+#   例: Br: {min: 10.0, max: 11.0}
+magnetic: {}

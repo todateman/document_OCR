@@ -1,0 +1,5 @@
+__pycache__/
+.venv/
+.pytest_cache/
+# --debug の出力（検査成績書の内容を含む）
+debug/
