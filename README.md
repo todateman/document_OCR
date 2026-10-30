@@ -27,7 +27,49 @@
 | `configs/neomag.yaml` | NeoMag 検査成績書（NeoMag 専用） |
 | `configs/denshitenbin.yaml` | 電子天秤検査成績書（汎用様式。基準画像は `configs/denshitenbin.jpg`） |
 
+## 実行ファイルで使う
+
+Python の環境構築なしで使えます。[Releases](https://github.com/todateman/document_OCR/releases) から環境に合うファイルを取得してください。
+
+| ファイル | 動作対象 |
+| --- | --- |
+| `*-windows-x64.zip` | Windows 10/11（x64） |
+| `*-macos-arm64.tar.gz` | macOS 14 以降（Apple Silicon） |
+| `*-linux-x64.tar.gz` | Ubuntu 22.04 以降（x64） |
+| `*-linux-arm64.tar.gz` | Ubuntu 22.04 以降（arm64）、Raspberry Pi OS 64bit Bookworm 以降 |
+
+Raspberry Pi OS 32bit、Raspberry Pi OS Bullseye 以前、Intel Mac には対応していません（`onnxruntime` の配布がない、または glibc が古いため）。
+
+1. **自分が書き込めるフォルダ**に展開します（Program Files や `/opt` に置くと設定を保存できません）。
+2. フォルダ内の `document_OCR`（Windows は `document_OCR.exe`）を起動します。コマンドラインで使うときは `document_OCR_cli` です。
+
+署名していないため、初回は OS の警告が出ます。
+
+- Windows: SmartScreen の画面で「詳細情報」→「実行」を選びます。ウイルス対策ソフトが誤検知することもあります。
+- macOS: 展開したフォルダに `xattr -dr com.apple.quarantine <フォルダ>` を実行してから起動します。Finder からダブルクリックすると、ターミナルも一緒に開きます。
+
+環境ごとの注意点は次のとおりです。
+
+- Tesseract は含まれません。Tesseract を使う様式（`configs/neomag.yaml` など）では、[OCR エンジン](#2-ocr-エンジン)の手順で別途インストールしてください。
+- Linux で日本語が表示されないときは `sudo apt install fonts-noto-cjk` を実行してください。GUI にはデスクトップ環境が必要です（Raspberry Pi OS Lite では `document_OCR_cli` のみ使えます）。
+- Raspberry Pi では OCR の処理に PC より時間がかかります。
+
+更新するときは、新しいフォルダに展開してから、使っていた `configs/` と `settings.yaml` を移してください。
+
+### リリース手順（開発者向け）
+
+タグを push すると、[GitHub Actions](.github/workflows/build.yml) が各 OS 用にビルドして Releases に公開します。
+
+```bash
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+macOS 版は GPL のライブラリを含みます（[NOTICE](NOTICE)）。対応するソースを提供できる状態にしてから、リポジトリ変数 `PUBLISH_MACOS` を `true` にしてください。設定するまで macOS 版はビルドとテストだけを行い、公開しません。
+
 ## セットアップ
+
+ソースコードから実行する場合の手順です。
 
 ### 1. uv
 
@@ -409,6 +451,9 @@ PDF・Excel については、サンプル画像から作った電子 PDF・ス�
 LICENSE                  ライセンス（Apache-2.0）
 NOTICE                   著作権表示と第三者の著作物について
 OCR判定.bat              GUI の起動（ダブルクリック）
+document_ocr.spec        実行ファイルのビルド設定（PyInstaller）
+.github/workflows/       実行ファイルのビルドとリリース
+licenses/GPL-3.0.txt     macOS 版の配布物に同梱する GPL の全文
 docs/images/             README 用のスクリーンショット
 ocr_gui.py               GUI（判定タブ・様式設定タブ）
 inspection_ocr.py        コマンドライン ＋ NeoMag 専用の読み取り・判定
