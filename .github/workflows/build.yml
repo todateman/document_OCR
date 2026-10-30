@@ -55,7 +55,7 @@ jobs:
       - name: Add configs and licenses
         run: |
           out=dist/document_OCR
-          cp -R configs settings.yaml LICENSE NOTICE README.md "$out/"
+          cp -R configs docs sample settings.yaml LICENSE NOTICE README.md "$out/"
           uv run --with pip-licenses pip-licenses --with-license-file --no-license-path \
             --format=plain-vertical --output-file "$out/THIRD_PARTY_LICENSES.txt"
           find .venv -path '*opencv_python_headless*' -name LICENSE-3RD-PARTY.txt \
@@ -73,7 +73,7 @@ jobs:
           # サンプルは合格（終了コード 0）になる。クラッシュも 1 を返すので 0 以外は失敗にする
           cd dist/document_OCR
           for name in denshitenbin_kensa_seisekisho01.jpg denshitenbin_kensa_seisekisho01_scan.pdf; do
-            ./document_OCR_cli "../../sample/$name" --config configs/denshitenbin.yaml
+            ./document_OCR_cli "sample/$name" --config configs/denshitenbin.yaml
           done
 
       - name: Test the GUI starts

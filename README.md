@@ -42,6 +42,7 @@ Raspberry Pi OS 32bit、Raspberry Pi OS Bullseye 以前、Intel Mac には対応
 
 1. **自分が書き込めるフォルダ**に展開します（Program Files や `/opt` に置くと設定を保存できません）。
 2. フォルダ内の `document_OCR`（Windows は `document_OCR.exe`）を起動します。コマンドラインで使うときは `document_OCR_cli` です。
+3. 試すときは、判定タブで様式「電子天秤検査成績書」を選び、`sample/` フォルダの `denshitenbin_kensa_seisekisho01.jpg` を追加して判定します。
 
 署名していないため、初回は OS の警告が出ます。
 
