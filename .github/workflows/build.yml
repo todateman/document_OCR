@@ -69,13 +69,10 @@ jobs:
 
       - name: Test the CLI
         run: |
-          # 0: 合格、1: 不合格、2: 要目視確認。3 以上は読み取りエラー
+          # サンプルは合格（終了コード 0）になる。クラッシュも 1 を返すので 0 以外は失敗にする
           cd dist/document_OCR
           for name in denshitenbin_kensa_seisekisho01.jpg denshitenbin_kensa_seisekisho01_scan.pdf; do
-            code=0
-            ./document_OCR_cli "../../sample/$name" --config configs/denshitenbin.yaml || code=$?
-            echo "$name: exit code $code"
-            if [ "$code" -gt 2 ]; then exit 1; fi
+            ./document_OCR_cli "../../sample/$name" --config configs/denshitenbin.yaml
           done
 
       - name: Test the GUI starts

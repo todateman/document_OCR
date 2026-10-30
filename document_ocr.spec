@@ -17,9 +17,7 @@ def analysis(script):
 
 
 def exe(a, name, console):
-    # CLI の日本語の出力が、リダイレクト先の文字コードで落ちないようにする
-    options = [("X utf8_mode=1", None, "OPTION")] if console else []
-    return EXE(PYZ(a.pure), a.scripts, options, exclude_binaries=True, name=name, console=console)
+    return EXE(PYZ(a.pure), a.scripts, exclude_binaries=True, name=name, console=console)
 
 
 gui = analysis("ocr_gui.py")
