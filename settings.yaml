@@ -5,7 +5,3 @@ tesseract_cmd: null
 
 # Tesseract で文字（日本語）項目を読むときの言語。jpn の言語データが必要
 tesseract_lang: jpn+eng
-
-# indra-ocr のモデルフォルダ。null なら初回に Hugging Face からダウンロードしてキャッシュ
-# （2 回目以降は通信しない）。ネットワークの無い PC ではモデルを置いたフォルダを指定する
-indra_model_dir: null

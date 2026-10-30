@@ -1,5 +1,10 @@
+.DS_Store
 __pycache__/
 .venv/
 .pytest_cache/
 # --debug の出力（検査成績書の内容を含む）
 debug/
+
+# 実在の帳票（手元での検証用。リポジトリには含めない）
+sample/1ASp_Ae_26G829.pdf
+sample/kitou2.pdf

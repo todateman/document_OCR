@@ -4,6 +4,9 @@ GUI（ocr_gui.py）で基準画像に枠を描いて作った設定ファイル�
 入力画像を基準画像に位置合わせ（ORB 特徴点 + ホモグラフィ）してから、
 枠の座標で各項目を切り出して読む。
 
+入力と基準画像には、画像のほか PDF・Excel も使える（document_input.py でページ画像にする）。
+電子 PDF の文字や Excel のセル値（テキスト層）が枠の中にあれば、OCR の代わりにそれを読む。
+
 項目の種類 (kind):
     text   … 文字。expect に一致→OK、ng_values に一致→NG、それ以外→要確認
     number … 数値。min/max で OK/NG、書式・信頼度の問題→要確認
@@ -22,6 +25,7 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from document_input import Page, Word, load_source
 from ocr_common import (
     CHECK,
     NG,
@@ -30,10 +34,9 @@ from ocr_common import (
     LayoutError,
     Read,
     Row,
-    indra_page_lines,
     lines_in_cell,
-    load_image_gray,
     ocr_cell,
+    page_lines,
     pad,
     parse_number,
     verdict_of,
@@ -51,12 +54,15 @@ _DASHES = "−－ー‐―–—"
 
 # ---------------------------------------------------------------- 画像
 
-def load_page(path: Path) -> np.ndarray:
-    gray = load_image_gray(path)
-    s = MAX_SIDE / max(gray.shape)
-    if s < 1:
-        gray = cv2.resize(gray, None, fx=s, fy=s, interpolation=cv2.INTER_AREA)
-    return gray
+def load_document(path: Path, page: int = 0) -> Page:
+    """画像・PDF・Excel の 1 ページ。MAX_SIDE より大きければ縮小する（テキスト層の座標も合わせる）。"""
+    doc = load_source(path, page)
+    s = MAX_SIDE / max(doc.gray.shape)
+    return doc.scaled(s) if s < 1 else doc
+
+
+def load_page(path: Path, page: int = 0) -> np.ndarray:
+    return load_document(path, page).gray
 
 
 def reference_path(cfg: dict) -> Path:
@@ -80,8 +86,8 @@ def load_reference(cfg: dict):
     return _reference(str(p), p.stat().st_mtime)
 
 
-def align(gray: np.ndarray, cfg: dict) -> np.ndarray:
-    """入力画像を基準画像の座標系に合わせて変形した画像を返す。"""
+def homography(gray: np.ndarray, cfg: dict) -> np.ndarray:
+    """入力画像の座標を基準画像の座標に変換する射影変換行列。"""
     ref, kp_ref, des_ref = load_reference(cfg)
     kp, des = cv2.ORB_create(nfeatures=5000).detectAndCompute(gray, None)
     if des is None or des_ref is None or len(kp) < MIN_INLIERS:
@@ -104,7 +110,29 @@ def align(gray: np.ndarray, cfg: dict) -> np.ndarray:
     ref_area = ref.shape[0] * ref.shape[1]
     if not cv2.isContourConvex(corners.astype(np.int32)) or not 0.3 < area / ref_area < 3:
         raise LayoutError("位置合わせの結果が不自然です。様式が違う可能性があります")
+    return H
+
+
+def warp(gray: np.ndarray, H: np.ndarray, cfg: dict) -> np.ndarray:
+    ref, _, _ = load_reference(cfg)
     return cv2.warpPerspective(gray, H, (ref.shape[1], ref.shape[0]), flags=cv2.INTER_LINEAR, borderValue=255)
+
+
+def align(gray: np.ndarray, cfg: dict) -> np.ndarray:
+    """入力画像を基準画像の座標系に合わせて変形した画像を返す。"""
+    return warp(gray, homography(gray, cfg), cfg)
+
+
+def warp_words(words: list[Word], H: np.ndarray) -> list[Word]:
+    """テキスト層の枠を基準画像の座標に変換する（変換後の 4 隅の外接矩形）。"""
+    if not words:
+        return []
+    pts = np.float32([[(b[0], b[1]), (b[2], b[1]), (b[2], b[3]), (b[0], b[3])] for b, _, _ in words])
+    out = cv2.perspectiveTransform(pts.reshape(-1, 1, 2), H).reshape(-1, 4, 2)
+    return [
+        ((float(q[:, 0].min()), float(q[:, 1].min()), float(q[:, 0].max()), float(q[:, 1].max())), t, c)
+        for q, (_, t, c) in zip(out, words)
+    ]
 
 
 @dataclass
@@ -400,34 +428,44 @@ class TemplateReport:
 
 
 def read_targets(
-    gray: np.ndarray, cfg: dict, engine: str, ref: np.ndarray, char_h: int = 20
+    gray: np.ndarray, cfg: dict, engine: str, ref: np.ndarray, char_h: int = 20,
+    words: list[Word] | None = None,
 ) -> list[tuple[dict, list[tuple[Target, Read]]]]:
-    """位置合わせ済みの画像から各読み取り単位の OCR 結果を取り出す（判定はしない）。"""
-    fields = expand(cfg, ref)
-    lines = indra_page_lines(gray, cfg.get("indra_model_dir")) if engine == "indra" else None
+    """位置合わせ済みの画像から各読み取り単位の OCR 結果を取り出す（判定はしない）。
+
+    words（基準画像の座標のテキスト層）があれば、枠の中の文字はそれを読み、文字が無い枠だけ OCR する。
+    """
+    lines = None  # RapidOCR のページ全体の結果。OCR が必要になったときに 1 回だけ読む
     margin = max(2, char_h // 6)
+
+    def ocr(t: Target) -> Read:
+        nonlocal lines
+        x0, y0, x1, y1 = t.box
+        if engine == "rapidocr":
+            if lines is None:
+                lines = page_lines(gray)
+            return lines_in_cell(lines, x0, x1, y0, y1, margin)
+        lang = cfg.get("tesseract_lang", "jpn+eng") if t.rule.get("kind") == "text" else None
+        return ocr_cell(gray, x0, x1, y0, y1, margin, lang, scale=min(max(40 / char_h, 1), 4))
+
     out = []
-    for f, targets in fields:
+    for f, targets in expand(cfg, ref):
         reads = []
         for t in targets:
             x0, y0, x1, y1 = t.box
-            if lines is not None:
-                r = lines_in_cell(lines, x0, x1, y0, y1, margin)
-            else:
-                lang = cfg.get("tesseract_lang", "jpn+eng") if t.rule.get("kind") == "text" else None
-                r = ocr_cell(gray, x0, x1, y0, y1, margin, lang, scale=min(max(40 / char_h, 1), 4))
-            reads.append((t, r))
+            r = lines_in_cell(words, x0, x1, y0, y1, margin) if words else None
+            reads.append((t, r if r is not None and r.text else ocr(t)))
         out.append((f, reads))
     return out
 
 
-def evaluate(gray: np.ndarray, cfg: dict, engine: str) -> TemplateReport:
+def evaluate(gray: np.ndarray, cfg: dict, engine: str, words: list[Word] | None = None) -> TemplateReport:
     ref, _, _ = load_reference(cfg)
     min_conf = cfg.get("min_confidence", 60)
     ink = ink_of(gray)
     items: list[Item] = []
     cells: list[Cell] = []
-    for i, (f, reads) in enumerate(read_targets(gray, cfg, engine, ref, ink.char_h)):
+    for i, (f, reads) in enumerate(read_targets(gray, cfg, engine, ref, ink.char_h, words)):
         name = f.get("name", "")
         if f.get("kind") == "mark":
             opts = [o for o in f.get("options") or [] if o.get("box")]
@@ -447,15 +485,20 @@ def evaluate(gray: np.ndarray, cfg: dict, engine: str) -> TemplateReport:
                 cell = judge_text(r, t.rule, min_conf)
             cells.append(cell)  # Target の通し番号（expand の n）と同じ順
             items.append(Item(t.name, cell, t.box, i))
-    return TemplateReport(cfg.get("name", ""), engine, items, [], gray)
+    label = f"テキスト層 + {engine}" if words else engine
+    return TemplateReport(cfg.get("name", ""), label, items, [], gray)
 
 
-def analyze(path: Path, cfg: dict, engine: str, debug_dir: Path | None = None) -> TemplateReport:
-    gray = align(load_page(path), cfg)
-    rep = evaluate(gray, cfg, engine)
+def analyze(
+    path: Path, cfg: dict, engine: str, debug_dir: Path | None = None, page: int = 0
+) -> TemplateReport:
+    doc = load_document(path, page)
+    H = homography(doc.gray, cfg)
+    gray = warp(doc.gray, H, cfg)
+    rep = evaluate(gray, cfg, engine, warp_words(doc.words, H) if doc.words else None)
     if debug_dir:
         debug_dir.mkdir(parents=True, exist_ok=True)
-        out = debug_dir / f"{Path(path).stem}_cells.png"
+        out = debug_dir / f"{Path(path).stem}{f'_p{page + 1}' if page else ''}_cells.png"
         cv2.imencode(".png", draw_boxes(gray, rep.rows()))[1].tofile(out)
     return rep
 

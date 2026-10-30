@@ -4,7 +4,7 @@ description: |-
   電子天秤検査成績書のサンプル様式。
   数値の規格（調整後 ±2d）は仮の値です。実際の規格に設定してください。
 reference_image: denshitenbin.jpg
-engine: indra
+engine: rapidocr
 min_confidence: 60
 fields:
 - name: 基本情報

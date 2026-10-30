@@ -2,7 +2,7 @@
 type: neomag
 name: NeoMag 検査成績書
 
-# OCR エンジン: tesseract / indra（コマンドラインの --engine で上書き可）
+# OCR エンジン: tesseract / rapidocr（コマンドラインの --engine で上書き可）
 engine: tesseract
 
 # これ未満の OCR 信頼度 (0-100) のセルは「要確認」にする
