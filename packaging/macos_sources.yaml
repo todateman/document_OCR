@@ -287,6 +287,8 @@ libraries:
   dylibs:
   - libgnutls.30.dylib
   url: https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
+  mirrors:
+  - https://www.mirrorservice.org/sites/ftp.gnupg.org/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
   sha256: 69e113d802d1670c4d5ac1b99040b1f2d5c7c05daec5003813c049b5184820ed
   homebrew_commit: 339ad061a3aa9419e30804a9bf343d83a5327877
 - name: graphite2
