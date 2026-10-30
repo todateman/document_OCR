@@ -1,0 +1,135 @@
+# 各 OS の実行ファイルをビルドし、v* タグでは GitHub Releases に公開する。
+# macOS 版は GPL のライブラリを含むので、対応するソースを用意してリポジトリ変数
+# PUBLISH_MACOS を true にするまでアップロードしない（README の「リリース手順」を参照）。
+name: Build
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/build.yml
+      - document_ocr.spec
+      - pyproject.toml
+      - uv.lock
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { runner: windows-latest, platform: windows-x64 }
+          - { runner: macos-latest, platform: macos-arm64 }
+          # 古い glibc でビルドするほど広い環境で動く
+          - { runner: ubuntu-22.04, platform: linux-x64 }
+          - { runner: ubuntu-22.04-arm, platform: linux-arm64 }
+    runs-on: ${{ matrix.runner }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      # 公式 CPython を使う（tkinter を確実に同梱するため）
+      UV_PYTHON: "3.13"
+      UV_PYTHON_PREFERENCE: only-system
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+      - uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Install Linux packages
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y tk xvfb fonts-noto-cjk
+
+      - run: uv sync --locked
+      - run: uv run pytest tests
+      - run: uv run pyinstaller document_ocr.spec --noconfirm
+
+      - name: Add configs and licenses
+        run: |
+          out=dist/document_OCR
+          cp -R configs settings.yaml LICENSE NOTICE README.md "$out/"
+          uv run --with pip-licenses pip-licenses --with-license-file --no-license-path \
+            --format=plain-vertical --output-file "$out/THIRD_PARTY_LICENSES.txt"
+          find .venv -path '*opencv_python_headless*' -name LICENSE-3RD-PARTY.txt \
+            -exec cp {} "$out/OpenCV-LICENSE-3RD-PARTY.txt" \;
+
+      - name: Add GPL notice (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          out=dist/document_OCR
+          cp licenses/GPL-3.0.txt "$out/"
+          ls "$out/_internal/cv2/.dylibs" > "$out/MACOS_BUNDLED_LIBRARIES.txt"
+
+      - name: Test the CLI
+        run: |
+          # サンプルは合格（終了コード 0）になる。クラッシュも 1 を返すので 0 以外は失敗にする
+          cd dist/document_OCR
+          for name in denshitenbin_kensa_seisekisho01.jpg denshitenbin_kensa_seisekisho01_scan.pdf; do
+            ./document_OCR_cli "../../sample/$name" --config configs/denshitenbin.yaml
+          done
+
+      - name: Test the GUI starts
+        if: runner.os != 'Windows'
+        run: |
+          if [ "$RUNNER_OS" = Linux ]; then
+            Xvfb :99 -screen 0 1400x900x24 &
+            export DISPLAY=:99
+            sleep 2
+          fi
+          dist/document_OCR/document_OCR &
+          pid=$!
+          sleep 20
+          kill -0 "$pid"
+          kill "$pid"
+
+      - name: Test the GUI starts (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          # 起動に失敗すると PyInstaller のエラーダイアログが出てプロセスが残るので、ウィンドウタイトルも確かめる
+          $p = Start-Process dist/document_OCR/document_OCR.exe -PassThru
+          Start-Sleep 20
+          $p.Refresh()
+          if ($p.HasExited) { throw "GUI exited with code $($p.ExitCode)" }
+          if ($p.MainWindowTitle -cnotmatch 'OCR') { throw "unexpected window: '$($p.MainWindowTitle)'" }
+          Stop-Process $p
+
+      - name: Create the archive
+        run: |
+          ref="${GITHUB_REF_NAME//\//-}"
+          cd dist
+          if [ "$RUNNER_OS" = Windows ]; then
+            7z a "document_OCR-$ref-${{ matrix.platform }}.zip" document_OCR
+          else
+            tar -czf "document_OCR-$ref-${{ matrix.platform }}.tar.gz" document_OCR
+          fi
+
+      - uses: actions/upload-artifact@v7
+        if: matrix.platform != 'macos-arm64' || vars.PUBLISH_MACOS == 'true'
+        with:
+          name: ${{ matrix.platform }}
+          path: dist/document_OCR-*
+          compression-level: 0
+          retention-days: 14
+
+  release:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --generate-notes artifacts/*/*

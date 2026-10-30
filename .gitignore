@@ -2,6 +2,9 @@
 __pycache__/
 .venv/
 .pytest_cache/
+# PyInstaller の出力
+build/
+dist/
 # --debug の出力（検査成績書の内容を含む）
 debug/
 

@@ -20,7 +20,8 @@ import pytesseract
 import yaml
 from PIL import Image
 
-ROOT = Path(__file__).resolve().parent
+# 実行ファイル版では、利用者が編集する settings.yaml と configs/ を実行ファイルの隣に置く
+ROOT = Path(sys.executable).parent if getattr(sys, "frozen", False) else Path(__file__).resolve().parent
 SETTINGS_PATH = ROOT / "settings.yaml"
 CONFIG_DIR = ROOT / "configs"
 
@@ -96,6 +97,7 @@ def find_tesseract(cfg: dict) -> str:
         shutil.which("tesseract"),
         r"C:\Program Files\Tesseract-OCR\tesseract.exe",
         os.path.expandvars(r"%LOCALAPPDATA%\Programs\Tesseract-OCR\tesseract.exe"),
+        "/opt/homebrew/bin/tesseract",  # Finder から起動すると Homebrew の PATH が通らない
     ]
     for c in candidates:
         if c and Path(c).is_file():

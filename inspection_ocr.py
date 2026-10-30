@@ -434,4 +434,5 @@ def main(argv: list[str] | None = None) -> int:
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(errors="backslashreplace")  # 日本語を出力できない文字コードの環境でも落ちないように
     sys.exit(main())
