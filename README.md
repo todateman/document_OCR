@@ -65,7 +65,13 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-macOS 版は GPL のライブラリを含みます（[NOTICE](NOTICE)）。対応するソースを提供できる状態にしてから、リポジトリ変数 `PUBLISH_MACOS` を `true` にしてください。設定するまで macOS 版はビルドとテストだけを行い、公開しません。
+macOS 版は GPL のライブラリを含みます（[NOTICE](NOTICE)）。ビルド時に、対応するソース一式（`*-macos-sources.tar.gz`）も作ります。公開するにはリポジトリ変数 `PUBLISH_MACOS` を `true` にしてください。実行ファイルとソースが同じ Release に載ります。設定するまでは、ビルドとテストだけを行い、公開しません。Release から macOS 版のソースだけを消さないでください。
+
+OpenCV を更新すると、`packaging/macos_sources.yaml` と wheel の dylib が一致しなくなり、CI が止まります。その場合は、新しい wheel の dylib ごとに版を調べ、一覧の版、URL、`sha256`、Homebrew のコミットを更新してください。確認は次のコマンドでできます。
+
+```bash
+uv run python packaging/build_macos_sources.py --output dist/sources.tar.gz --check-only
+```
 
 ## セットアップ
 
@@ -454,6 +460,7 @@ OCR判定.bat              GUI の起動（ダブルクリック）
 document_ocr.spec        実行ファイルのビルド設定（PyInstaller）
 .github/workflows/       実行ファイルのビルドとリリース
 licenses/GPL-3.0.txt     macOS 版の配布物に同梱する GPL の全文
+packaging/               macOS 版のソース一式の作成（ライブラリの一覧とスクリプト）
 docs/images/             README 用のスクリーンショット
 ocr_gui.py               GUI（判定タブ・様式設定タブ）
 inspection_ocr.py        コマンドライン ＋ NeoMag 専用の読み取り・判定

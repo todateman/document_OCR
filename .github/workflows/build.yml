@@ -1,6 +1,6 @@
 # 各 OS の実行ファイルをビルドし、v* タグでは GitHub Releases に公開する。
-# macOS 版は GPL のライブラリを含むので、対応するソースを用意してリポジトリ変数
-# PUBLISH_MACOS を true にするまでアップロードしない（README の「リリース手順」を参照）。
+# macOS 版は GPL のライブラリを含むので、対応するソース一式も作って同じ Release に載せる。
+# リポジトリ変数 PUBLISH_MACOS を true にするまでアップロードしない（README の「リリース手順」を参照）。
 name: Build
 
 on:
@@ -11,6 +11,7 @@ on:
     paths:
       - .github/workflows/build.yml
       - document_ocr.spec
+      - packaging/**
       - pyproject.toml
       - uv.lock
 
@@ -110,6 +111,12 @@ jobs:
           else
             tar -czf "document_OCR-$ref-${{ matrix.platform }}.tar.gz" document_OCR
           fi
+
+      - name: Create the source archive (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          ref="${GITHUB_REF_NAME//\//-}"
+          uv run python packaging/build_macos_sources.py --output "dist/document_OCR-$ref-macos-sources.tar.gz"
 
       - uses: actions/upload-artifact@v7
         if: matrix.platform != 'macos-arm64' || vars.PUBLISH_MACOS == 'true'

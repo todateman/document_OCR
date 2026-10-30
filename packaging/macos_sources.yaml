@@ -1,0 +1,754 @@
+# macOS 版の実行ファイルに含まれるライブラリとソースの対応（packaging/build_macos_sources.py が使う）。
+# OpenCV を更新すると照合で CI が止まるので、README の「リリース手順」に従ってこの一覧を更新する。
+#
+# evidence: 版を特定した根拠
+#   binary   バイナリに含まれる版の文字列と一致
+#   filename dylib のファイル名の版と一致
+#   inferred soname と Homebrew の履歴からの推定（ほとんどのライブラリの取得時期である 2025 年 7 月ごろに合わせて選んだ）
+# x264 のライセンスは当時の式の GPL-2.0-only が誤りで、Homebrew が 2025-06 に修正した（ソースのヘッダーでも確認）。
+# aom は googlesource の +archive の内容が固定されないので、公式の配布物を使う。
+opencv_wheel: 5.0.0.93
+python_packages_without_sdist:
+  flatbuffers:
+    version: 25.12.19
+    url: https://github.com/google/flatbuffers/archive/refs/tags/v25.12.19.tar.gz
+    sha256: f81c3162b1046fe8b84b9a0dbdd383e24fdbcf88583b9cb6028f90d04d90696a
+  onnxruntime:
+    version: 1.31.1
+    url: https://github.com/microsoft/onnxruntime/archive/refs/tags/v1.31.1.tar.gz
+    sha256: 92ffbf8b97872fd1e73c9eebdf3319d9a3b24919ae438d27db903b72ee08939e
+  rapidocr:
+    version: 3.10.0
+    url: https://github.com/RapidAI/RapidOCR/archive/refs/tags/v3.10.0.tar.gz
+    sha256: b7b0e4e85c544be14e6223e3ebb77ad26287637024b0ff1c94ff791e07ee0ed9
+libraries:
+- name: openexr
+  version: 3.3.4
+  license: BSD-3-Clause
+  evidence: binary
+  dylibs:
+  - libIex-3_3.32.3.3.4.dylib
+  - libIlmThread-3_3.32.3.3.4.dylib
+  - libOpenEXR-3_3.32.3.3.4.dylib
+  - libOpenEXRCore-3_3.32.3.3.4.dylib
+  url: https://github.com/AcademySoftwareFoundation/openexr/archive/refs/tags/v3.3.4.tar.gz
+  sha256: 63abac7c52f280e3e16fc868ac40e06449733bb19179008248ae7e34e4f19824
+  homebrew_commit: 9d86508f304d912797636d0be8eca4408f1e47a1
+- name: imath
+  version: 3.1.12
+  license: BSD-3-Clause
+  evidence: inferred
+  dylibs:
+  - libImath-3_1.29.11.0.dylib
+  url: https://github.com/AcademySoftwareFoundation/Imath/archive/refs/tags/v3.1.12.tar.gz
+  sha256: 8a1bc258f3149b5729c2f4f8ffd337c0e57f09096e4ba9784329f40c4a9035da
+  homebrew_commit: 893bec5ff1481696c345fa0a50122adfaa72209d
+- name: sdl2
+  version: 2.32.8
+  license: Zlib
+  evidence: binary
+  dylibs:
+  - libSDL2-2.0.0.dylib
+  url: https://github.com/libsdl-org/SDL/releases/download/release-2.32.8/SDL2-2.32.8.tar.gz
+  sha256: 0ca83e9c9b31e18288c7ec811108e58bac1f1bb5ec6577ad386830eac51c787e
+  homebrew_commit: 7dab08c101e314187c5783a35ef9b10913d64730
+- name: svt-av1
+  version: 3.0.2
+  license: BSD-3-Clause
+  evidence: binary
+  dylibs:
+  - libSvtAv1Enc.3.0.2.dylib
+  url: https://gitlab.com/AOMediaCodec/SVT-AV1/-/archive/v3.0.2/SVT-AV1-v3.0.2.tar.bz2
+  sha256: 7548a380cd58a46998ab4f1a02901ef72c37a7c6317c930cde5df2e6349e437b
+  homebrew_commit: 2b41ec5a6f3f74963bc22879d9a99e144b53525e
+- name: libx11
+  version: 1.8.12
+  license: MIT
+  evidence: binary
+  dylibs:
+  - libX11.6.dylib
+  url: https://www.x.org/archive/individual/lib/libX11-1.8.12.tar.gz
+  sha256: 220fbcf54b6e4d8dc40076ff4ab87954358019982490b33c7802190b62d89ce1
+  homebrew_commit: 92978fb3c9cc2265379048740e02d4c9f623fbca
+- name: libxau
+  version: 1.0.12
+  license: MIT
+  evidence: inferred
+  dylibs:
+  - libXau.6.dylib
+  url: https://www.x.org/archive/individual/lib/libXau-1.0.12.tar.xz
+  sha256: 74d0e4dfa3d39ad8939e99bda37f5967aba528211076828464d2777d477fc0fb
+  homebrew_commit: 173f2ff115cf4a52b99736d0a01f9eaef2b72539
+- name: libxdmcp
+  version: 1.1.5
+  license: MIT
+  evidence: inferred
+  dylibs:
+  - libXdmcp.6.dylib
+  url: https://www.x.org/archive/individual/lib/libXdmcp-1.1.5.tar.xz
+  sha256: d8a5222828c3adab70adf69a5583f1d32eb5ece04304f7f8392b6a353aa2228c
+  homebrew_commit: 3a13629cb6fe15ec39732bb48152208423a2abda
+- name: aom
+  version: 3.12.1
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - libaom.3.12.1.dylib
+  url: https://storage.googleapis.com/aom-releases/libaom-3.12.1.tar.gz
+  sha256: 9e9775180dec7dfd61a79e00bda3809d43891aee6b2e331ff7f26986207ea22e
+  homebrew_commit: 04e05d367bee8d8b05eb766c01464862c9f2a952
+- name: libarchive
+  version: 3.8.1
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - libarchive.13.dylib
+  url: https://www.libarchive.org/downloads/libarchive-3.8.1.tar.xz
+  sha256: 19f917d42d530f98815ac824d90c7eaf648e9d9a50e4f309c812457ffa5496b5
+  homebrew_commit: 32bc7c6d82510307a8f5ac7e5a87cc4abe4ff046
+- name: aribb24
+  version: 1.0.4
+  license: LGPL-3.0-only
+  evidence: inferred
+  dylibs:
+  - libaribb24.0.dylib
+  url: https://code.videolan.org/jeeb/aribb24/-/archive/v1.0.4/aribb24-v1.0.4.tar.bz2
+  sha256: 88b58dd760609372701087e25557ada9f7c6d973306c017067c5dcaf9e2c9710
+  homebrew_commit: cd99615a709b156221b1c7f171969a2c4b9c4f7a
+- name: libass
+  version: 0.17.4
+  license: ISC
+  evidence: binary
+  dylibs:
+  - libass.9.dylib
+  url: https://github.com/libass/libass/releases/download/0.17.4/libass-0.17.4.tar.xz
+  sha256: 78f1179b838d025e9c26e8fef33f8092f65611444ffa1bfc0cfac6a33511a05a
+  homebrew_commit: c1ffb402a53ff92419db213efe5d2c2ba7945483
+- name: ffmpeg
+  version: 7.1.1
+  license: GPL-2.0-or-later
+  evidence: binary
+  dylibs:
+  - libavcodec.61.19.101.dylib
+  - libavdevice.61.3.100.dylib
+  - libavfilter.10.4.100.dylib
+  - libavformat.61.7.100.dylib
+  - libavutil.59.39.100.dylib
+  - libpostproc.58.3.100.dylib
+  - libswresample.5.3.100.dylib
+  - libswscale.8.3.100.dylib
+  url: https://ffmpeg.org/releases/ffmpeg-7.1.1.tar.xz
+  sha256: 733984395e0dbbe5c046abda2dc49a5544e7e0e1e2366bba849222ae9e3a03b1
+  homebrew_commit: 32fd8d2e67bb3415112c3ad1c9328bf5859cb051
+  patches:
+  - url: https://github.com/FFmpeg/FFmpeg/commit/d1ed5c06e3edc5f2b5f3664c80121fa55b0baa95.patch?full_index=1
+    sha256: 0eb23ab90c0e5904590731dd3b81c86a4127785bc2b367267d77723990fb94a2
+  - url: https://gitlab.archlinux.org/archlinux/packaging/packages/ffmpeg/-/raw/5670ccd86d3b816f49ebc18cab878125eca2f81f/add-av_stream_get_first_dts-for-chromium.patch
+    sha256: 57e26caced5a1382cb639235f9555fc50e45e7bf8333f7c9ae3d49b3241d3f77
+- name: libavif
+  version: 1.3.0
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - libavif.16.3.0.dylib
+  url: https://github.com/AOMediaCodec/libavif/archive/refs/tags/v1.3.0.tar.gz
+  sha256: 0a545e953cc049bf5bcf4ee467306a2f113a75110edf59e61248873101cd26c1
+  homebrew_commit: 6b40db614b33c6d0764762424ea965bfcf15630a
+- name: libb2
+  version: 0.98.1
+  license: CC0-1.0
+  evidence: inferred
+  dylibs:
+  - libb2.1.dylib
+  url: https://github.com/BLAKE2/libb2/releases/download/v0.98.1/libb2-0.98.1.tar.gz
+  sha256: 53626fddce753c454a3fea581cbbc7fe9bbcf0bc70416d48fdbbf5d87ef6c72e
+  homebrew_commit: 9becf7889b0ea29f171cbd3a457b38cf9a095b9c
+  patches:
+  - url: https://raw.githubusercontent.com/Homebrew/formula-patches/03cf8088210822aa2c1ab544ed58ea04c897d9c4/libtool/configure-big_sur.diff
+    sha256: 35acd6aebc19843f1a2b3a63e880baceb0f5278ab1ace661e57a502d9d78c93c
+- name: libbluray
+  version: 1.3.4
+  license: LGPL-2.1-or-later
+  evidence: binary
+  dylibs:
+  - libbluray.2.dylib
+  url: https://download.videolan.org/videolan/libbluray/1.3.4/libbluray-1.3.4.tar.bz2
+  sha256: 478ffd68a0f5dde8ef6ca989b7f035b5a0a22c599142e5cd3ff7b03bbebe5f2b
+  homebrew_commit: b6c80205eaaca07cc8405a40e430e0cd25fc5ae0
+- name: brotli
+  version: 1.1.0
+  license: MIT
+  evidence: filename
+  dylibs:
+  - libbrotlicommon.1.1.0.dylib
+  - libbrotlidec.1.1.0.dylib
+  - libbrotlienc.1.1.0.dylib
+  url: https://github.com/google/brotli/archive/refs/tags/v1.1.0.tar.gz
+  sha256: e720a6ca29428b803f4ad165371771f5398faba397edf6778837a18599ea13ff
+  homebrew_commit: 79f7e63c7793e8e2d073dd9f57baddea0f390d71
+- name: cjson
+  version: 1.7.18
+  license: MIT
+  evidence: filename
+  dylibs:
+  - libcjson.1.7.18.dylib
+  url: https://github.com/DaveGamble/cJSON/archive/refs/tags/v1.7.18.tar.gz
+  sha256: 3aa806844a03442c00769b83e99970be70fbef03735ff898f4811dd03b9f5ee5
+  homebrew_commit: c85592eac53cbb0a00e04ca9a665ebe36fc366dd
+- name: openssl@3
+  version: 3.6.0
+  license: Apache-2.0
+  evidence: binary
+  dylibs:
+  - libcrypto.3.dylib
+  - libssl.3.dylib
+  url: https://github.com/openssl/openssl/releases/download/openssl-3.6.0/openssl-3.6.0.tar.gz
+  sha256: b6a5f44b7eb69e3fa35dbf15524405b44837a481d43d81daddde3ff21fcbb8e9
+  homebrew_commit: 94108d2635467b7824b146ca147839244359f25e
+- name: dav1d
+  version: 1.5.1
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - libdav1d.7.dylib
+  url: https://code.videolan.org/videolan/dav1d/-/archive/1.5.1/dav1d-1.5.1.tar.bz2
+  sha256: 4eddffd108f098e307b93c9da57b6125224dc5877b1b3d157b31be6ae8f1f093
+  homebrew_commit: 714ae98ddc765ce02a72bcd0d0f94dff5c37c7ec
+- name: libdeflate
+  version: '1.24'
+  license: MIT
+  evidence: inferred
+  dylibs:
+  - libdeflate.0.dylib
+  url: https://github.com/ebiggers/libdeflate/archive/refs/tags/v1.24.tar.gz
+  sha256: ad8d3723d0065c4723ab738be9723f2ff1cb0f1571e8bfcf0301ff9661f475e8
+  homebrew_commit: 7a221eb4ea411103e2b230c6dfe8f6ffd522d3dc
+- name: fontconfig
+  version: 2.16.0
+  license: MIT
+  evidence: binary
+  dylibs:
+  - libfontconfig.1.dylib
+  url: https://www.freedesktop.org/software/fontconfig/release/fontconfig-2.16.0.tar.xz
+  sha256: 6a33dc555cc9ba8b10caf7695878ef134eeb36d0af366041f639b1da9b6ed220
+  homebrew_commit: 730416c3cf95784ea5f0448e377cafcf7cbaf886
+- name: freetype
+  version: 2.13.3
+  license: FTL
+  evidence: inferred
+  dylibs:
+  - libfreetype.6.dylib
+  url: https://downloads.sourceforge.net/project/freetype/freetype2/2.13.3/freetype-2.13.3.tar.xz
+  sha256: 0550350666d427c74daeb85d5ac7bb353acba5f76956395995311a9c6f063289
+  homebrew_commit: d208085082e2c751b20c3e24b237fb15dca17aa3
+- name: fribidi
+  version: 1.0.16
+  license: 'all_of: ["GPL-2.0-or-later", "LGPL-2.1-or-later"]'
+  evidence: binary
+  dylibs:
+  - libfribidi.0.dylib
+  url: https://github.com/fribidi/fribidi/releases/download/v1.0.16/fribidi-1.0.16.tar.xz
+  sha256: 1b1cde5b235d40479e91be2f0e88a309e3214c8ab470ec8a2744d82a5a9ea05c
+  homebrew_commit: 2d3203c53c45a3715b814abe097fc1493b0e2fce
+- name: giflib
+  version: 5.2.2
+  license: MIT
+  evidence: inferred
+  dylibs:
+  - libgif.7.2.0.dylib
+  url: https://downloads.sourceforge.net/project/giflib/giflib-5.x/giflib-5.2.2.tar.gz
+  sha256: be7ffbd057cadebe2aa144542fd90c6838c6a083b5e8a9048b8ee3b66b29d5fb
+  homebrew_commit: 1d3a3a0bf5075c1c431131a42fe6399d61bbab32
+- name: glib
+  version: 2.84.3
+  license: LGPL-2.1-or-later
+  evidence: binary
+  dylibs:
+  - libglib-2.0.0.dylib
+  url: https://download.gnome.org/sources/glib/2.84/glib-2.84.3.tar.xz
+  sha256: aa4f87c3225bf57ca85f320888f7484901a17934ca37023c3bd8435a72db863e
+  homebrew_commit: a2f5a978f3a334ee992177497538cb9e9053c9df
+  patches:
+  - url: https://raw.githubusercontent.com/Homebrew/formula-patches/b46d8deae6983110b4e39bb2971bcbd10bb59716/glib/hardcoded-paths.diff
+    sha256: d846efd0bf62918350da94f850db33b0f8727fece9bfaf8164566e3094e80c97
+- name: gmp
+  version: 6.3.0
+  license: 'any_of: ["LGPL-3.0-or-later", "GPL-2.0-or-later"]'
+  evidence: binary
+  dylibs:
+  - libgmp.10.dylib
+  url: https://ftpmirror.gnu.org/gnu/gmp/gmp-6.3.0.tar.xz
+  sha256: a3c2b80201b89e68616f4ad30bc66aee4927c3ce50e33929ca819d5c43538898
+  homebrew_commit: a69e3084b8552a079e740b9a8f4c8db179620a77
+- name: gnutls
+  version: 3.8.9
+  license: 'all_of: ["LGPL-2.1-or-later", "GPL-3.0-only"]'
+  evidence: binary
+  dylibs:
+  - libgnutls.30.dylib
+  url: https://www.gnupg.org/ftp/gcrypt/gnutls/v3.8/gnutls-3.8.9.tar.xz
+  sha256: 69e113d802d1670c4d5ac1b99040b1f2d5c7c05daec5003813c049b5184820ed
+  homebrew_commit: 339ad061a3aa9419e30804a9bf343d83a5327877
+- name: graphite2
+  version: 1.3.14
+  license: 'any_of: ["GPL-2.0-or-later", "LGPL-2.1-or-later", "MPL-1.1+"]'
+  evidence: inferred
+  dylibs:
+  - libgraphite2.3.2.1.dylib
+  url: https://github.com/silnrsi/graphite/releases/download/1.3.14/graphite2-1.3.14.tgz
+  sha256: f99d1c13aa5fa296898a181dff9b82fb25f6cc0933dbaa7a475d8109bd54209d
+  homebrew_commit: 1cf03dd7783d303bd6d9b347bd5877773e45d2da
+- name: harfbuzz
+  version: 11.2.1
+  license: MIT
+  evidence: binary
+  dylibs:
+  - libharfbuzz.0.dylib
+  url: https://github.com/harfbuzz/harfbuzz/archive/refs/tags/11.2.1.tar.gz
+  sha256: 057d5754c3ac0c499bbf4d729d52acf134c7bb4ba8868ba22e84ae96bc272816
+  homebrew_commit: fd9055132a481d7272e4e50eeeb8b60fb7f9bf36
+- name: nettle
+  version: 3.10.2
+  license: 'any_of: ["GPL-2.0-or-later", "LGPL-3.0-or-later"]'
+  evidence: inferred
+  dylibs:
+  - libhogweed.6.10.dylib
+  - libnettle.8.10.dylib
+  url: https://ftpmirror.gnu.org/gnu/nettle/nettle-3.10.2.tar.gz
+  sha256: fe9ff51cb1f2abb5e65a6b8c10a92da0ab5ab6eaf26e7fc2b675c45f1fb519b5
+  homebrew_commit: 5a34ad455e5c3e364eee1266d1c25a162fe51628
+- name: highway
+  version: 1.2.0
+  license: Apache-2.0
+  evidence: binary
+  dylibs:
+  - libhwy.1.2.0.dylib
+  url: https://github.com/google/highway/archive/refs/tags/1.2.0.tar.gz
+  sha256: 7e0be78b8318e8bdbf6fa545d2ecb4c90f947df03f7aadc42c1967f019e63343
+  homebrew_commit: fc8523df5b5449bc8e1cf2bb2d5acdeebe2aaece
+- name: libidn2
+  version: 2.3.8
+  license: 'all_of: [ { any_of: ["GPL-2.0-or-later", "LGPL-3.0-or-later"] }, # lib { all_of: ["Unicode-TOU", "Unicode-DFS-2016"] }, # matching COPYING.unicode "GPL-3.0-or-later", # bin "LGPL-2.1-or-later",
+    # parts of gnulib "FSFAP-no-warranty-disclaimer", # man3 ]'
+  evidence: binary
+  dylibs:
+  - libidn2.0.dylib
+  url: https://ftpmirror.gnu.org/gnu/libidn/libidn2-2.3.8.tar.gz
+  sha256: f557911bf6171621e1f72ff35f5b1825bb35b52ed45325dcdee931e5d3c0787a
+  homebrew_commit: b4104f2c99d14f27a0f241ad9ab46d8e87517b1d
+- name: gettext
+  version: '0.25'
+  license: GPL-3.0-or-later
+  evidence: binary
+  dylibs:
+  - libintl.8.dylib
+  url: https://ftp.gnu.org/gnu/gettext/gettext-0.25.1.tar.gz
+  sha256: 746f955d42d71eb69ce763869cb92682f09a4066528d018b6ca7a3f48089a085
+  homebrew_commit: f2d868d79131e460a0bb89b8f988de94390d53cc
+- name: jpeg-turbo
+  version: 3.1.1
+  license: 'all_of: [ "IJG", # libjpeg API library and programs "Zlib", # libjpeg-turbo SIMD source code "BSD-3-Clause", # TurboJPEG API library and programs ]'
+  evidence: binary
+  dylibs:
+  - libjpeg.8.3.2.dylib
+  url: https://github.com/libjpeg-turbo/libjpeg-turbo/releases/download/3.1.1/libjpeg-turbo-3.1.1.tar.gz
+  sha256: aadc97ea91f6ef078b0ae3a62bba69e008d9a7db19b34e4ac973b19b71b4217c
+  homebrew_commit: 2de817ac4305566bf180900a11bc111ffba0d06a
+- name: jpeg-xl
+  version: 0.11.1
+  license: BSD-3-Clause
+  evidence: filename
+  dylibs:
+  - libjxl.0.11.1.dylib
+  - libjxl_cms.0.11.1.dylib
+  - libjxl_threads.0.11.1.dylib
+  url: https://github.com/libjxl/libjxl/archive/refs/tags/v0.11.1.tar.gz
+  sha256: 1492dfef8dd6c3036446ac3b340005d92ab92f7d48ee3271b5dac1d36945d3d9
+  homebrew_commit: 0dc9968a333b8a5bd5f58d435e0fca9dd97aa7e6
+- name: little-cms2
+  version: '2.17'
+  license: MIT
+  evidence: inferred
+  dylibs:
+  - liblcms2.2.dylib
+  url: https://downloads.sourceforge.net/project/lcms/lcms/2.17/lcms2-2.17.tar.gz
+  sha256: d11af569e42a1baa1650d20ad61d12e41af4fead4aa7964a01f93b08b53ab074
+  homebrew_commit: 0812eff4fd7327dbdf5180ae817e41aae9912742
+- name: leptonica
+  version: 1.85.0
+  license: BSD-2-Clause
+  evidence: inferred
+  dylibs:
+  - libleptonica.6.dylib
+  url: https://github.com/DanBloomberg/leptonica/releases/download/1.85.0/leptonica-1.85.0.tar.gz
+  sha256: 3745ae3bf271a6801a2292eead83ac926e3a9bc1bf622e9cd4dd0f3786e17205
+  homebrew_commit: ee6b7d8646862be34e469fd6751659a44b2a8e1a
+- name: lz4
+  version: 1.10.0
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - liblz4.1.10.0.dylib
+  url: https://github.com/lz4/lz4/archive/refs/tags/v1.10.0.tar.gz
+  sha256: 537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b
+  homebrew_commit: ba5f440dac7b251bb7a5fe0f907bdec7dabc521e
+- name: xz
+  version: 5.8.1
+  license: 'all_of: [ "0BSD", "GPL-2.0-or-later", ]'
+  evidence: binary
+  dylibs:
+  - liblzma.5.dylib
+  url: https://github.com/tukaani-project/xz/releases/download/v5.8.1/xz-5.8.1.tar.gz
+  sha256: 507825b599356c10dca1cd720c9d0d0c9d5400b9de300af00e4d1ea150795543
+  homebrew_commit: 43cad045a4ea71a2d9bf08bcb272bd5f89f5ede2
+- name: mbedtls
+  version: 3.6.3
+  license: Apache-2.0
+  evidence: binary
+  dylibs:
+  - libmbedcrypto.3.6.3.dylib
+  url: https://github.com/Mbed-TLS/mbedtls/releases/download/v3.6.3.1/mbedtls-3.6.3.1.tar.bz2
+  sha256: 243ed496d5f88a5b3791021be2800aac821b9a4cc16e7134aa413c58b4c20e0c
+  homebrew_commit: 8626eee76547f4849652c4807bcd1cd315b17239
+- name: lame
+  version: '3.100'
+  license: LGPL-2.0-or-later
+  evidence: binary
+  dylibs:
+  - libmp3lame.0.dylib
+  url: https://downloads.sourceforge.net/project/lame/lame/3.100/lame-3.100.tar.gz
+  sha256: ddfe36cab873794038ae2c1210557ad34857a4b6bdc515785d1da9e175b1da1e
+  homebrew_commit: cefc5baab4ff82c5b936871d4bd705f2c89e43a4
+- name: libogg
+  version: 1.3.6
+  license: BSD-3-Clause
+  evidence: inferred
+  dylibs:
+  - libogg.0.dylib
+  url: https://ftp.osuosl.org/pub/xiph/releases/ogg/libogg-1.3.6.tar.gz
+  sha256: 83e6704730683d004d20e21b8f7f55dcb3383cdf84c0daedf30bde175f774638
+  homebrew_commit: eaac60900e5c2443e99764171151b0624d0191b1
+- name: opencore-amr
+  version: 0.1.6
+  license: Apache-2.0
+  evidence: inferred
+  dylibs:
+  - libopencore-amrnb.0.dylib
+  - libopencore-amrwb.0.dylib
+  url: https://downloads.sourceforge.net/project/opencore-amr/opencore-amr/opencore-amr-0.1.6.tar.gz
+  sha256: 483eb4061088e2b34b358e47540b5d495a96cd468e361050fae615b1809dc4a1
+  homebrew_commit: ed6347801e825df557a6479bb046816035fbeb1e
+- name: openjpeg
+  version: 2.5.3
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - libopenjp2.2.5.3.dylib
+  url: https://github.com/uclouvain/openjpeg/archive/refs/tags/v2.5.3.tar.gz
+  sha256: 368fe0468228e767433c9ebdea82ad9d801a3ad1e4234421f352c8b06e7aa707
+  homebrew_commit: 725fa82e0ddf48b67a188c807148a6251dc4ceb3
+- name: opus
+  version: 1.5.2
+  license: BSD-3-Clause
+  evidence: binary
+  dylibs:
+  - libopus.0.dylib
+  url: https://ftp.osuosl.org/pub/xiph/releases/opus/opus-1.5.2.tar.gz
+  sha256: 65c1d2f78b9f2fb20082c38cbe47c951ad5839345876e46941612ee87f9a7ce1
+  homebrew_commit: 9584e3b900056ced38288349287d152ae7a301e2
+- name: p11-kit
+  version: 0.25.5
+  license: BSD-3-Clause
+  evidence: binary
+  dylibs:
+  - libp11-kit.0.dylib
+  url: https://github.com/p11-glue/p11-kit/releases/download/0.25.5/p11-kit-0.25.5.tar.xz
+  sha256: 04d0a86450cdb1be018f26af6699857171a188ac6d5b8c90786a60854e1198e5
+  homebrew_commit: 4135b7c7a33c1c4e485dd474c840dae72fd14487
+- name: pcre2
+  version: '10.45'
+  license: BSD-3-Clause
+  evidence: binary
+  dylibs:
+  - libpcre2-8.0.dylib
+  url: https://github.com/PCRE2Project/pcre2/releases/download/pcre2-10.45/pcre2-10.45.tar.bz2
+  sha256: 21547f3516120c75597e5b30a992e27a592a31950b5140e7b8bfde3f192033c4
+  homebrew_commit: 2ba54c05ebbc60f986647bb541d7c585ded3a6fe
+- name: libpng
+  version: 1.6.49
+  license: libpng-2.0
+  evidence: binary
+  dylibs:
+  - libpng16.16.dylib
+  url: https://downloads.sourceforge.net/project/libpng/libpng16/1.6.49/libpng-1.6.49.tar.xz
+  sha256: 43182aa48e39d64b1ab4ec6b71ab3e910b67eed3a0fff3777cf8cf40d6ef7024
+  homebrew_commit: 5fa3d2808dd972e237a0a550d65722c30b1c2dba
+- name: rav1e
+  version: 0.8.0
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - librav1e.0.8.0.dylib
+  url: https://github.com/xiph/rav1e/archive/refs/tags/v0.8.0.tar.gz
+  sha256: 2580bb4b4efae50e0a228e8ba80db1f73805a0e6f6a8c22bee066c90afb35ba0
+  homebrew_commit: 70d469c67ef7e138834fd2346193225c6336134a
+- name: librist
+  version: 0.2.11
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - librist.4.dylib
+  url: https://code.videolan.org/rist/librist/-/archive/v0.2.11/librist-v0.2.11.tar.gz
+  sha256: 84e413fa9a1bc4e2607ecc0e51add363e1bc5ad42f7cc5baec7b253e8f685ad3
+  homebrew_commit: 8ed20f74b6185c7f4129bfb6fe4511239192d3d7
+- name: rubberband
+  version: 4.0.0
+  license: GPL-2.0-or-later
+  evidence: inferred
+  dylibs:
+  - librubberband.3.dylib
+  url: https://breakfastquay.com/files/releases/rubberband-4.0.0.tar.bz2
+  sha256: af050313ee63bc18b35b2e064e5dce05b276aaf6d1aa2b8a82ced1fe2f8028e9
+  homebrew_commit: efdd2b578aaf3eb3cadbbb12fc71680a7d816517
+- name: libsamplerate
+  version: 0.2.2
+  license: BSD-2-Clause
+  evidence: binary
+  dylibs:
+  - libsamplerate.0.2.2.dylib
+  url: https://github.com/libsndfile/libsamplerate/archive/refs/tags/0.2.2.tar.gz
+  sha256: 16e881487f184250deb4fcb60432d7556ab12cb58caea71ef23960aec6c0405a
+  homebrew_commit: d6ec641f7e2fc0674b7086918ab3855de5c04f87
+  patches:
+  - url: https://github.com/libsndfile/libsamplerate/commit/e4a0ab46887029e0f65f145ba3987cc592f18200.patch?full_index=1
+    sha256: 0826fb59d733188645f3dc207c938580970700381b9bc87058b137723cb30bba
+  - url: https://github.com/libsndfile/libsamplerate/commit/1abc639420b2df8b9ff2e0bdcc28cf6613c7c0d0.patch?full_index=1
+    sha256: b6fb61c763a0f072ef2ebb3a311037d2429a5e294141f6d5e552ccd25efabdc0
+- name: webp
+  version: 1.5.0
+  license: BSD-3-Clause
+  evidence: inferred
+  dylibs:
+  - libsharpyuv.0.1.1.dylib
+  - libwebp.7.1.10.dylib
+  - libwebpmux.3.1.1.dylib
+  url: https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-1.5.0.tar.gz
+  sha256: 7d6fab70cf844bf6769077bd5d7a74893f8ffd4dfb42861745750c63c2a5c92c
+  homebrew_commit: d5f505a34579ac8dc30a480c1ce99f393676e995
+- name: snappy
+  version: 1.2.2
+  license: BSD-3-Clause
+  evidence: filename
+  dylibs:
+  - libsnappy.1.2.2.dylib
+  url: https://github.com/google/snappy/archive/refs/tags/1.2.2.tar.gz
+  sha256: 90f74bc1fbf78a6c56b3c4a082a05103b3a56bb17bca1a27e052ea11723292dc
+  homebrew_commit: 39a1a6e7fee48864d57e19f3ce846e92bdc709a6
+- name: libsodium
+  version: 1.0.20
+  license: ISC
+  evidence: binary
+  dylibs:
+  - libsodium.26.dylib
+  url: https://download.libsodium.org/libsodium/releases/libsodium-1.0.20.tar.gz
+  sha256: ebb65ef6ca439333c2bb41a0c1990587288da07f6c7fd07cb3a18cc18d30ce19
+  homebrew_commit: 8dab6a246ed70c4c86faff18e0dc7774b2f567b6
+- name: libsoxr
+  version: 0.1.3
+  license: LGPL-2.1-or-later
+  evidence: binary
+  dylibs:
+  - libsoxr.0.1.2.dylib
+  url: https://downloads.sourceforge.net/project/soxr/soxr-0.1.3-Source.tar.xz
+  sha256: b111c15fdc8c029989330ff559184198c161100a59312f5dc19ddeb9b5a15889
+  homebrew_commit: 0778f8abf17eb2a5faee60eedd8fdf253f8b9c87
+  patches:
+  - url: https://raw.githubusercontent.com/Homebrew/formula-patches/76868b36263be42440501d3692fd3a258f507d82/libsoxr/arm64_defines.patch
+    sha256: 9df5737a21b9ce70cc136c302e195fad9f9f6c14418566ad021f14bb34bb022c
+- name: speex
+  version: 1.2.1
+  license: BSD-3-Clause
+  evidence: binary
+  dylibs:
+  - libspeex.1.dylib
+  url: https://ftp.osuosl.org/pub/xiph/releases/speex/speex-1.2.1.tar.gz
+  sha256: 4b44d4f2b38a370a2d98a78329fefc56a0cf93d1c1be70029217baae6628feea
+  homebrew_commit: 8b7609ba245e1ac5a4182c77e6503da8fe75cc8a
+- name: srt
+  version: 1.5.4
+  license: MPL-2.0
+  evidence: binary
+  dylibs:
+  - libsrt.1.5.4.dylib
+  url: https://github.com/Haivision/srt/archive/refs/tags/v1.5.4.tar.gz
+  sha256: d0a8b600fe1b4eaaf6277530e3cfc8f15b8ce4035f16af4a5eb5d4b123640cdd
+  homebrew_commit: b2c76d395cb8f27682b5c75c0ba54985eed44d53
+  patches:
+  - url: https://github.com/Haivision/srt/commit/7962936829e016295e5c570539eb2520b326da4c.patch?full_index=1
+    sha256: e4489630886bf8b26f63a23c8b1aec549f7280f07713ded07fce281e542725f7
+- name: libssh
+  version: 0.11.1
+  license: LGPL-2.1-or-later
+  evidence: binary
+  dylibs:
+  - libssh.4.10.1.dylib
+  url: https://www.libssh.org/files/0.11/libssh-0.11.1.tar.xz
+  sha256: 14b7dcc72e91e08151c58b981a7b570ab2663f630e7d2837645d5a9c612c1b79
+  homebrew_commit: d35aa0cf691ed46a353c43b7aa07bf4c9691cd84
+- name: libtasn1
+  version: 4.20.0
+  license: LGPL-2.1-or-later
+  evidence: binary
+  dylibs:
+  - libtasn1.6.dylib
+  url: https://ftpmirror.gnu.org/gnu/libtasn1/libtasn1-4.20.0.tar.gz
+  sha256: 92e0e3bd4c02d4aeee76036b2ddd83f0c732ba4cda5cb71d583272b23587a76c
+  homebrew_commit: caf4cb1a6ceb1439bf43c0aaa463d9ef2e97008f
+- name: tesseract
+  version: 5.5.1
+  license: Apache-2.0
+  evidence: binary
+  dylibs:
+  - libtesseract.5.dylib
+  url: https://github.com/tesseract-ocr/tesseract/archive/refs/tags/5.5.1.tar.gz
+  sha256: a7a3f2a7420cb6a6a94d80c24163e183cf1d2f1bed2df3bbc397c81808a57237
+  homebrew_commit: ae73d3b86f2e475118047439b3ec2995beee80bf
+- name: theora
+  version: 1.1.1
+  license: BSD-3-Clause
+  evidence: inferred
+  dylibs:
+  - libtheoradec.1.dylib
+  - libtheoraenc.1.dylib
+  url: https://ftp.osuosl.org/pub/xiph/releases/theora/libtheora-1.1.1.tar.bz2
+  sha256: b6ae1ee2fa3d42ac489287d3ec34c5885730b1296f0801ae577a35193d3affbc
+  homebrew_commit: 5e8b10adfd3dc0521f99163d4231ae31c1f72ded
+  patches:
+  - url: https://raw.githubusercontent.com/Homebrew/formula-patches/03cf8088210822aa2c1ab544ed58ea04c897d9c4/libtool/configure-pre-0.4.2.418-big_sur.diff
+    sha256: 83af02f2aa2b746bb7225872cab29a253264be49db0ecebb12f841562d9a2923
+- name: libtiff
+  version: 4.7.0
+  license: libtiff
+  evidence: binary
+  dylibs:
+  - libtiff.6.dylib
+  url: https://download.osgeo.org/libtiff/tiff-4.7.0.tar.gz
+  sha256: 67160e3457365ab96c5b3286a0903aa6e78bdc44c4bc737d2e486bcecb6ba976
+  homebrew_commit: 7126d557e20a3752feff863a0d4941b75bd0fba0
+- name: libunibreak
+  version: '6.1'
+  license: Zlib
+  evidence: inferred
+  dylibs:
+  - libunibreak.6.dylib
+  url: https://github.com/adah1972/libunibreak/releases/download/libunibreak_6_1/libunibreak-6.1.tar.gz
+  sha256: cc4de0099cf7ff05005ceabff4afed4c582a736abc38033e70fdac86335ce93f
+  homebrew_commit: 8dc0ae483964633e645e2531f3d4b9588c413553
+- name: libunistring
+  version: '1.3'
+  license: 'any_of: ["GPL-2.0-only", "LGPL-3.0-or-later"]'
+  evidence: inferred
+  dylibs:
+  - libunistring.5.dylib
+  url: https://ftpmirror.gnu.org/gnu/libunistring/libunistring-1.3.tar.gz
+  sha256: 8ea8ccf86c09dd801c8cac19878e804e54f707cf69884371130d20bde68386b7
+  homebrew_commit: bc1540c647d28ede9bfef2b25353c41dbe440bb2
+- name: libvidstab
+  version: 1.1.1
+  license: GPL-2.0-or-later
+  evidence: inferred
+  dylibs:
+  - libvidstab.1.2.dylib
+  url: https://github.com/georgmartius/vid.stab/archive/refs/tags/v1.1.1.tar.gz
+  sha256: 9001b6df73933555e56deac19a0f225aae152abbc0e97dc70034814a1943f3d4
+  homebrew_commit: afc0dea32bf887f4ea2d9b6ea9b873f9a29b7ed6
+- name: libvmaf
+  version: 3.0.0
+  license: BSD-2-Clause-Patent
+  evidence: binary
+  dylibs:
+  - libvmaf.3.dylib
+  url: https://github.com/Netflix/vmaf/archive/refs/tags/v3.0.0.tar.gz
+  sha256: 7178c4833639e6b989ecae73131d02f70735fdb3fc2c7d84bc36c9c3461d93b1
+  homebrew_commit: 0b765a70b4b06ec1df92222edc61c8a1d057bc66
+- name: libvorbis
+  version: 1.3.7
+  license: BSD-3-Clause
+  evidence: binary
+  dylibs:
+  - libvorbis.0.dylib
+  - libvorbisenc.2.dylib
+  url: https://ftp.osuosl.org/pub/xiph/releases/vorbis/libvorbis-1.3.7.tar.xz
+  sha256: b33cc4934322bcbf6efcbacf49e3ca01aadbea4114ec9589d1b1e9d20f72954b
+  homebrew_commit: 399c40f1ae9ea2abd886d759aabefaa58bee90ef
+- name: libvpx
+  version: 1.15.2
+  license: BSD-3-Clause
+  evidence: binary
+  dylibs:
+  - libvpx.11.dylib
+  url: https://github.com/webmproject/libvpx/archive/refs/tags/v1.15.2.tar.gz
+  sha256: 26fcd3db88045dee380e581862a6ef106f49b74b6396ee95c2993a260b4636aa
+  homebrew_commit: 86c2371386a5f0b8a81d890ba1a233a6153ded7c
+- name: x264
+  version: r3108
+  license: GPL-2.0-or-later
+  evidence: inferred
+  dylibs:
+  - libx264.164.dylib
+  url: https://code.videolan.org/videolan/x264/-/archive/31e19f92f00c7003fa115047ce50978bc98c3a0d/x264-31e19f92f00c7003fa115047ce50978bc98c3a0d.tar.gz
+  sha256: d053c9d86988d6bc78237ca5205865c5ddf99c98ef4cd9927eec8f6d388f6dd9
+  homebrew_commit: d07e79e83a7edd49e477daf53976782dcc1c4e1c
+- name: x265
+  version: '4.1'
+  license: GPL-2.0-or-later
+  evidence: binary
+  dylibs:
+  - libx265.215.dylib
+  url: https://bitbucket.org/multicoreware/x265_git/downloads/x265_4.1.tar.gz
+  sha256: a31699c6a89806b74b0151e5e6a7df65de4b49050482fe5ebf8a4379d7af8f29
+  homebrew_commit: ea07757ef4bcf86b5c31e7684f1e0c42b01691a2
+  patches:
+  - url: https://api.bitbucket.org/2.0/repositories/multicoreware/x265_git/diff/b354c009a60bcd6d7fc04014e200a1ee9c45c167
+    sha256: f7d3ce261c4b0cd461b55ad00de38ffa6a7cc2fa13ae6f034b3e46d8bb3cb6a8
+  - url: https://api.bitbucket.org/2.0/repositories/multicoreware/x265_git/diff/51ae8e922bcc4586ad4710812072289af91492a8
+    sha256: 56c78f60cbaac61a44cb6e9889ece3380f9b60d32a4b704e274d9a636a16379d
+- name: libxcb
+  version: 1.17.0
+  license: MIT
+  evidence: inferred
+  dylibs:
+  - libxcb-shape.0.0.0.dylib
+  - libxcb-shm.0.0.0.dylib
+  - libxcb-xfixes.0.0.0.dylib
+  - libxcb.1.1.0.dylib
+  url: https://xorg.freedesktop.org/archive/individual/lib/libxcb-1.17.0.tar.xz
+  sha256: 599ebf9996710fea71622e6e184f3a8ad5b43d0e5fa8c4e407123c88a59a6d55
+  homebrew_commit: 07d2b5e2abe3745aa214d7a89f2f0a4a18964ec3
+- name: zimg
+  version: 3.0.5
+  license: WTFPL
+  evidence: inferred
+  dylibs:
+  - libzimg.2.dylib
+  url: https://github.com/sekrit-twc/zimg/archive/refs/tags/release-3.0.5.tar.gz
+  sha256: a9a0226bf85e0d83c41a8ebe4e3e690e1348682f6a2a7838f1b8cbff1b799bcf
+  homebrew_commit: a37ad6fced5cc51ca73ccea10ef5139dc9cdcb17
+- name: zeromq
+  version: 4.3.5
+  license: MPL-2.0
+  evidence: inferred
+  dylibs:
+  - libzmq.5.dylib
+  url: https://github.com/zeromq/libzmq/releases/download/v4.3.5/zeromq-4.3.5.tar.gz
+  sha256: 6653ef5910f17954861fe72332e68b03ca6e4d9c7160eb3a8de5a5a913bfab43
+  homebrew_commit: 10ddb7f13a6d08d88d58eeaacf79b193f9d4603f
+- name: zstd
+  version: 1.5.7
+  license: 'all_of: [ { any_of: ["BSD-3-Clause", "GPL-2.0-only"] }, "BSD-2-Clause", # programs/zstdgrep, lib/libzstd.pc.in "MIT", # lib/dictBuilder/divsufsort.c ]'
+  evidence: binary
+  dylibs:
+  - libzstd.1.5.7.dylib
+  url: https://github.com/facebook/zstd/archive/refs/tags/v1.5.7.tar.gz
+  sha256: 37d7284556b20954e56e1ca85b80226768902e2edabd3b649e9e72c0c9012ee3
+  homebrew_commit: 88ee704e399293cd79dfdf7798056175533ffaa0

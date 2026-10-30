@@ -34,3 +34,5 @@ This product is licensed under the Apache License, Version 2.0 (see LICENSE).
      macOS 版の配布物は全体として GNU General Public License version 3 以降
      （同梱の GPL-3.0.txt）の条件で配布します。含まれるライブラリの一覧は
      MACOS_BUNDLED_LIBRARIES.txt を参照してください。
+     対応するソースは、同じ Release の document_OCR-<版>-macos-sources.tar.gz で提供します。
+     各ライブラリの版と、版を特定した根拠はその中の SOURCES.md を参照してください。
