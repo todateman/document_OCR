@@ -65,6 +65,16 @@ def download(url: str, dest: Path, sha256: str | None = None) -> str:
     return actual
 
 
+def download_first(urls: list[str], dest: Path, sha256: str) -> str:
+    """取得できるまで順に試す。sha256 の不一致はミラーで隠さず、すぐ失敗にする。"""
+    for url in urls[:-1]:
+        try:
+            return download(url, dest, sha256)
+        except subprocess.CalledProcessError as e:
+            print(f"{url} を取得できません（curl の終了コード {e.returncode}）。次の取得元を試します", file=sys.stderr)
+    return download(urls[-1], dest, sha256)
+
+
 def file_name(url: str) -> str:
     return url.split("?")[0].rstrip("/").rsplit("/", 1)[1]
 
@@ -75,7 +85,7 @@ def formula_path(name: str) -> str:
 
 def fetch_library(lib: dict, out: Path) -> None:
     d = out / "libraries" / f"{lib['name']}-{lib['version']}"
-    download(lib["url"], d / file_name(lib["url"]), lib["sha256"])
+    download_first([lib["url"], *lib.get("mirrors", [])], d / file_name(lib["url"]), lib["sha256"])
     for i, patch in enumerate(lib.get("patches", []), 1):
         download(patch["url"], d / "patches" / f"{i:02}-{file_name(patch['url'])}", patch["sha256"])
     # ビルド手順として Homebrew の式も同梱する（コミットで固定されているので内容は変わらない）
